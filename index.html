@@ -232,6 +232,14 @@ canvas{display:block;width:100%;height:auto}
 }
 #print-area{display:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.csv-pick{display:flex;flex-direction:column;gap:5px;font-weight:600;font-size:13px;color:var(--ink);margin-bottom:10px}
+.csv-pick input[type=file]{font-size:13px;background:var(--paper);border:1px dashed var(--line);border-radius:10px;padding:9px}
+.csv-guide{margin-top:8px;font-size:12.5px;line-height:1.6;color:var(--ink)}
+.csv-guide h4{margin:12px 0 3px;font-size:13px;color:var(--green)}
+.csv-guide code{background:var(--paper);border:1px solid var(--line2);border-radius:5px;padding:0 4px;font-size:12px}
+.csv-guide .col{margin:2px 0}
+.csv-guide .col b{color:var(--ink)}
+details>summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--green);padding:6px 0}
 </style>
 </head>
 <body>
@@ -329,6 +337,21 @@ const S = {
 };
 const eventsByCow = id => S.events.filter(e=>e.cowId===id)
   .sort((a,b)=> a.date<b.date?-1 : a.date>b.date?1 : (a.id<b.id?-1:1));
+
+/* CSV一括取り込み用の定義・状態 */
+const csvFiles = {farm:null, cows:null, events:null};   // 選択中のCSVファイル
+const CSV_TMPL = {
+  farm:  ['農場名','初産VWP','経産VWP','未経産授精開始日齢','妊娠期間','発情周期','未授精閾値','妊鑑閾値','損失単価'],
+  cows:  ['個体識別番号','牛名','牛番号','共済番号','生年月日','状態','備考'],
+  events:['個体識別番号','日付','種別','種雄','授精方法','精液種別','妊娠鑑定結果','左卵巣','右卵巣','子宮','BCS','処置','指示','備考']
+};
+const TYPE_MAP = {
+  '分娩':'calving','出産':'calving','calving':'calving',
+  '授精':'AI','種付':'AI','種付け':'AI','人工授精':'AI','受精':'AI','AI':'AI',
+  '妊娠鑑定':'preg_check','妊鑑':'preg_check','鑑定':'preg_check','preg_check':'preg_check',
+  '検診':'exam','検診所見':'exam','所見':'exam','診察':'exam','exam':'exam',
+  '乾乳':'dry_off','dry_off':'dry_off'
+};
 
 async function loadFarm(farmId){
   S.farm = S.farms.find(f=>f.id===farmId) || null;
@@ -1021,6 +1044,24 @@ function renderDataIO(){
     </div>
     <button class="btn" style="margin-top:14px" data-act="exportcsv">📄 選択項目をCSVで書き出す</button>
 
+    <div class="section-h">CSV一括取り込み（農場ごと・上書き）</div>
+    <div class="card pad">
+      <div class="info" style="margin-bottom:10px">選んだ農場に対して <b>牛とイベントを丸ごと入れ替え</b>ます（他の農場には影響しません）。文字コードは <b>UTF-8・Shift_JIS どちらでもOK</b>。日付は <code>2026-02-01</code> / <code>2026/2/1</code> / Excelの数値、いずれも読み取ります。</div>
+      <div style="font-weight:800;font-size:13px;margin:4px 0 6px">① ひな形を書き出してExcelで記入</div>
+      <div class="btn-row" style="display:flex;gap:8px">
+        <button class="btn sec" data-act="tmpl-farm">農場</button>
+        <button class="btn sec" data-act="tmpl-cows">牛</button>
+        <button class="btn sec" data-act="tmpl-events">イベント</button>
+      </div>
+      <details><summary>列の説明・記入例を見る</summary>${csvGuideHTML()}</details>
+      <div style="font-weight:800;font-size:13px;margin:14px 0 8px">② 記入したCSVを選ぶ</div>
+      <label class="csv-pick">農場CSV（任意）<input type="file" accept=".csv,text/csv,text/comma-separated-values" data-csv="farm"></label>
+      <label class="csv-pick">牛CSV<input type="file" accept=".csv,text/csv,text/comma-separated-values" data-csv="cows"></label>
+      <label class="csv-pick">イベントCSV（任意）<input type="file" accept=".csv,text/csv,text/comma-separated-values" data-csv="events"></label>
+      <div id="csv-status" class="info" style="margin-top:4px">${csvSummary()}</div>
+      <button class="btn" style="margin-top:12px" data-act="importcsv">📥 この内容で取り込む（上書き）</button>
+    </div>
+
     <div class="section-h">画像・印刷</div>
     <div class="stack">
       <button class="btn sec" data-act="exportjmrpng2">🖼 JMR月別推移グラフをPNGで書き出す</button>
@@ -1121,6 +1162,190 @@ function importJSON(file){
     }catch(e){ alert('読み込みに失敗しました：'+e.message); }
   };
   r.readAsText(file);
+}
+
+/* =====================================================================
+   CSV 一括取り込み（農場ごと・上書き）
+   ===================================================================== */
+/* 文字コードを推定して読む（UTF-8優先、化けたらShift_JIS） */
+function readFileSmart(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>{
+      const buf=new Uint8Array(r.result);
+      let text='';
+      try{ text=new TextDecoder('utf-8',{fatal:false}).decode(buf); }catch(e){ text=''; }
+      if(text.indexOf('\uFFFD')>=0){                 // 置換文字＝UTF-8で化けた
+        try{ text=new TextDecoder('shift_jis').decode(buf); }catch(e){/* utf-8のまま */}
+      }
+      res(text);
+    };
+    r.onerror=()=>rej(r.error);
+    r.readAsArrayBuffer(file);
+  });
+}
+/* CSV → [{見出し:値,...}]（引用符・改行・カンマ・BOM対応） */
+function parseCSV(text){
+  const s=(text||'').replace(/^\uFEFF/,'');
+  const rows=[]; let field='', row=[], inQ=false;
+  for(let i=0;i<s.length;i++){
+    const c=s[i];
+    if(inQ){
+      if(c==='"'){ if(s[i+1]==='"'){ field+='"'; i++; } else inQ=false; }
+      else field+=c;
+    }else{
+      if(c==='"') inQ=true;
+      else if(c===','){ row.push(field); field=''; }
+      else if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else if(c==='\r'){ if(s[i+1]!=='\n'){ row.push(field); rows.push(row); row=[]; field=''; } }
+      else field+=c;
+    }
+  }
+  if(field!==''||row.length){ row.push(field); rows.push(row); }
+  if(!rows.length) return {headers:[],rows:[]};
+  const headers=rows[0].map(h=>String(h).trim());
+  const out=[];
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i];
+    if(r.length===1 && String(r[0]).trim()==='') continue;   // 空行スキップ
+    const o={}; headers.forEach((h,j)=>{ o[h]= r[j]!=null? String(r[j]).trim() : ''; });
+    out.push(o);
+  }
+  return {headers,rows:out};
+}
+/* 見出しゆらぎ吸収：候補名から最初に見つかった非空値を返す */
+function pick(row, names){ for(const n of names){ const v=row[n]; if(v!=null && String(v).trim()!=='') return String(v).trim(); } return ''; }
+/* 日付を 'YYYY-MM-DD' に正規化（ISO / スラッシュ / 年月日 / 8桁 / Excelシリアル値） */
+function ymd(y,m,d){ const Y=+y,M=+m,D=+d; if(!Y||!M||!D||M>12||D>31) return null; return `${Y}-${String(M).padStart(2,'0')}-${String(D).padStart(2,'0')}`; }
+function parseAnyDate(v){
+  if(v==null) return null;
+  const s=String(v).trim(); if(!s) return null;
+  if(/^\d{8}$/.test(s)) return ymd(s.slice(0,4),s.slice(4,6),s.slice(6,8));   // YYYYMMDD
+  if(/^\d+(\.\d+)?$/.test(s)){                                                 // Excelシリアル値
+    const n=parseFloat(s);
+    if(n>=20000 && n<=80000) return fromD(new Date(Date.UTC(1899,11,30,12)+Math.round(n)*DAY));
+    return null;
+  }
+  const m=s.match(/^(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);                          // 2024-5-1 / 2024/05/01 / 2024年5月1日
+  return m? ymd(m[1],m[2],m[3]) : null;
+}
+function downloadTemplate(kind){
+  const label={farm:'農場',cows:'牛',events:'イベント'}[kind];
+  download(`ひな形_${label}.csv`, toCSV([CSV_TMPL[kind]]), 'text/csv');
+  toast('ひな形を書き出しました');
+}
+function csvSummary(){
+  const p=[]; if(csvFiles.farm)p.push('農場「'+csvFiles.farm.name+'」'); if(csvFiles.cows)p.push('牛「'+csvFiles.cows.name+'」'); if(csvFiles.events)p.push('イベント「'+csvFiles.events.name+'」');
+  return p.length? '選択中：'+p.join(' ／ ') : 'ファイル未選択';
+}
+function csvGuideHTML(){
+  return `<div class="csv-guide">
+    <h4>農場CSV（任意・先頭行のみ使用）</h4>
+    <div class="col"><b>農場名</b>（必須 例:<code>第一牧場</code>）／ 初産VWP <code>80</code>／経産VWP <code>60</code>／未経産授精開始日齢 <code>390</code>／妊娠期間 <code>285</code>／発情周期 <code>21</code>／未授精閾値 <code>40</code>／妊鑑閾値 <code>28</code>／損失単価 <code>300</code>。空欄は既定値。<b>省略すると今選んでいる農場</b>に取り込みます。</div>
+    <h4>牛CSV（個体データ）</h4>
+    <div class="col"><b>個体識別番号</b>（例:<code>2851</code>・イベントと紐づけるキー）／牛名（例:<code>かれん</code>）／牛番号／共済番号／<b>生年月日</b>（例:<code>2021-03-01</code>・未経産JMRに必要）／状態（<code>在群/乾乳/出荷/淘汰</code>・既定 在群）／備考</div>
+    <h4>イベントCSV（履歴）</h4>
+    <div class="col"><b>個体識別番号</b>（牛CSVと一致）／<b>日付</b>（例:<code>2026-02-01</code>）／<b>種別</b>（<code>分娩/授精/妊娠鑑定/検診/乾乳</code>）／種雄／授精方法（<code>AI/ET</code>）／精液種別／妊娠鑑定結果（<code>妊娠/不妊/再検</code>）／左卵巣／右卵巣／子宮／BCS／処置／指示／備考。<span style="color:var(--muted)">※種別ごとに使う列だけ記入すればOK（分娩は日付だけでも可）。</span></div>
+  </div>`;
+}
+async function importCSVBundle(){
+  try{
+    if(!csvFiles.cows && !csvFiles.events){ alert('「牛」または「イベント」のCSVを選んでください。'); return; }
+    const warn=[];
+    const farmRows = csvFiles.farm ? parseCSV(await readFileSmart(csvFiles.farm)).rows : [];
+    const cowRows  = csvFiles.cows ? parseCSV(await readFileSmart(csvFiles.cows)).rows : [];
+    const evRows   = csvFiles.events ? parseCSV(await readFileSmart(csvFiles.events)).rows : [];
+
+    /* --- 取り込み先の農場を決定 --- */
+    let farm;
+    if(farmRows.length){
+      const fr=farmRows[0];
+      const fname=pick(fr,['農場名','農場','name']);
+      if(!fname){ alert('農場CSVの「農場名」が空です。'); return; }
+      const exist=S.farms.find(f=>f.name===fname);
+      farm = exist? {...exist} : {id:uid(), ...DEFAULT_FARM()};
+      farm.name=fname;
+      const setN=(k,names)=>{ const v=parseFloat(pick(fr,names)); if(!isNaN(v)) farm[k]=v; };
+      setN('vwpFirst',['初産VWP']); setN('vwpMulti',['経産VWP']); setN('heiferBreedingAge',['未経産授精開始日齢']);
+      setN('gestationDays',['妊娠期間']); setN('cycleDays',['発情周期']); setN('openAiThreshold',['未授精閾値']);
+      setN('pregCheckThreshold',['妊鑑閾値']); setN('lossPerDay',['損失単価']);
+      if(farmRows.length>1) warn.push(`農場CSVは複数行ありましたが先頭「${fname}」のみ使用しました。`);
+    }else{
+      if(!S.farm){ alert('取り込み先の農場がありません。農場CSVを付けるか、先に農場を作成/選択してください。'); return; }
+      farm={...S.farm};
+    }
+
+    /* --- 牛 --- */
+    const keyToCow=new Map(); const cows=[];
+    for(const r of cowRows){
+      const tag=pick(r,['個体識別番号','識別番号','タグ番号','タグ','耳標番号']);
+      const name=pick(r,['牛名','名前','個体名','名号']);
+      const key=tag||name;
+      if(!key){ warn.push('識別番号も牛名も無い行をスキップしました。'); continue; }
+      if(keyToCow.has(key)) warn.push(`識別「${key}」が重複。後の行で上書きしました。`);
+      const bdRaw=pick(r,['生年月日','誕生日']); const bd=parseAnyDate(bdRaw);
+      if(bdRaw && !bd) warn.push(`「${key}」の生年月日「${bdRaw}」を日付に変換できず空にしました。`);
+      let st=pick(r,['状態','ステータス'])||'在群';
+      if(!STATUS_LIST.includes(st)){ warn.push(`「${key}」の状態「${st}」は未対応→在群。`); st='在群'; }
+      const cow={ id:uid(), farmId:farm.id, name, tagNo:tag,
+        cowNo:pick(r,['牛番号','個体番号']), kyosaiNo:pick(r,['共済番号']),
+        birthDate: bd||'', status:st, note:pick(r,['備考','メモ']) };
+      keyToCow.set(key,cow); cows.push(cow);
+    }
+
+    /* --- イベント --- */
+    const events=[]; let stub=0, skipDate=0, skipType=0;
+    for(const r of evRows){
+      const key=pick(r,['個体識別番号','識別番号','タグ番号','タグ','耳標番号'])||pick(r,['牛名','名前']);
+      if(!key){ warn.push('個体識別番号の無いイベント行をスキップしました。'); continue; }
+      let cow=keyToCow.get(key);
+      if(!cow){ cow={ id:uid(), farmId:farm.id, name:key, tagNo:key, cowNo:'', kyosaiNo:'', birthDate:'', status:'在群', note:'CSV取込時に自動作成' }; keyToCow.set(key,cow); cows.push(cow); stub++; }
+      const type=TYPE_MAP[pick(r,['種別','イベント','種類','区分'])];
+      if(!type){ skipType++; continue; }
+      const date=parseAnyDate(pick(r,['日付','年月日','日']));
+      if(!date){ skipDate++; continue; }
+      const e={ id:uid(), cowId:cow.id, farmId:farm.id, type, date, note:pick(r,['備考','メモ']) };
+      if(type==='AI'){
+        e.sire=pick(r,['種雄','種雄牛','父']);
+        let m=pick(r,['授精方法','方法']).toUpperCase();
+        e.method=(m.includes('ET')||m.includes('移植'))?'ET':'AI';
+        e.semenType=pick(r,['精液種別','精液']);
+      }else if(type==='preg_check'){
+        const res=pick(r,['妊娠鑑定結果','鑑定結果','結果']);
+        e.result = res.includes('不')?'不妊' : res.includes('再')?'再検' : '妊娠';
+      }else if(type==='exam'){
+        e.leftOvary=pick(r,['左卵巣']); e.rightOvary=pick(r,['右卵巣']); e.uterus=pick(r,['子宮']);
+        const b=parseFloat(pick(r,['BCS','ボディコンディション'])); e.bcs=isNaN(b)?null:b;
+        e.treatment=pick(r,['処置','治療']); e.instruction=pick(r,['指示','指導']);
+      }
+      events.push(e);
+    }
+    if(skipType) warn.push(`種別を認識できないイベント ${skipType}件をスキップ。`);
+    if(skipDate) warn.push(`日付を変換できないイベント ${skipDate}件をスキップ。`);
+
+    /* --- 確認 --- */
+    const isNew=!S.farms.find(f=>f.id===farm.id);
+    const existCows = isNew? [] : await DB.byIndex('cows','farmId',farm.id);
+    let msg=`農場「${farm.name}」${isNew?'（新規作成）':'（既存を上書き）'}に取り込みます。\n牛 ${cows.length}頭 ／ イベント ${events.length}件\n`;
+    if(!isNew) msg+=`※この農場の既存の牛 ${existCows.length}頭・全イベントは削除して置き換えます。\n`;
+    if(stub) msg+=`※牛CSVに無い識別 ${stub}件はイベントから牛を自動作成しました。\n`;
+    if(warn.length) msg+='\n注意:\n'+warn.slice(0,8).map(w=>'・'+w).join('\n')+(warn.length>8?`\n・ほか${warn.length-8}件`:'');
+    msg+='\n\nこの内容で取り込みますか？（元に戻せません）';
+    if(!confirm(msg)) return;
+
+    /* --- 反映（農場ごと置き換え。他農場は不変） --- */
+    await DB.put('farms',farm);
+    for(const c of existCows){ const evs=await DB.byIndex('events','cowId',c.id); for(const e of evs) await DB.del('events',e.id); await DB.del('cows',c.id); }
+    if(cows.length) await DB.putMany('cows',cows);
+    if(events.length) await DB.putMany('events',events);
+    S.farms=await DB.getAll('farms');
+    await loadFarm(farm.id);
+    csvFiles.farm=csvFiles.cows=csvFiles.events=null;
+    go('home');
+    toast(`取り込み完了：牛${cows.length}・イベント${events.length}`);
+  }catch(e){
+    alert('取り込みに失敗しました：'+(e && e.message? e.message : e));
+  }
 }
 
 function exportJMRPNG(){
@@ -1307,6 +1532,10 @@ document.addEventListener('click', async (ev)=>{
     case 'exportcsv': exportCSV(); break;
     case 'exportjson': exportJSON(); break;
     case 'importjson': $('#import-file').click(); break;
+    case 'tmpl-farm': downloadTemplate('farm'); break;
+    case 'tmpl-cows': downloadTemplate('cows'); break;
+    case 'tmpl-events': downloadTemplate('events'); break;
+    case 'importcsv': importCSVBundle(); break;
     case 'printview': printView(); break;
   }
 });
@@ -1342,6 +1571,7 @@ document.addEventListener('change',(ev)=>{
   const t=ev.target;
   if(t.id==='farm-sel'){ loadFarm(t.value).then(()=>go('home')); return; }
   if(t.id==='import-file' && t.files[0]){ importJSON(t.files[0]); t.value=''; return; }
+  if(t.dataset && t.dataset.csv){ csvFiles[t.dataset.csv]=t.files[0]||null; const s=$('#csv-status'); if(s) s.textContent=csvSummary(); return; }
   if(t.id==='kpi-from'){ kpiRange.from=t.value; render(); return; }
   if(t.id==='kpi-to'){ kpiRange.to=t.value; render(); return; }
 });
