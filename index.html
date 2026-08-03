@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#276749">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="繁殖巡回">
+<title>繁殖巡回 記録・閲覧</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+:root{
+  --paper:#f4f3ef; --card:#ffffff; --ink:#1b241f; --muted:#5c6b62; --faint:#8a988f;
+  --line:#e3e6df; --line2:#eef0eb;
+  --green:#276749; --green-d:#1c5038; --green-l:#e7f0ea;
+  --teal:#0f766e;
+  --amber:#a85708; --amber-bg:#fbeed9;
+  --red:#a92318; --red-bg:#fbe6e3;
+  --yellow:#7a6a12; --yellow-bg:#f6f0d6;
+  --shadow:0 1px 2px rgba(20,40,30,.06),0 4px 14px rgba(20,40,30,.05);
+  --r:14px; --r-sm:10px;
+  --fs:16px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  background:var(--paper); color:var(--ink); font-size:var(--fs); line-height:1.5;
+  -webkit-font-smoothing:antialiased; overscroll-behavior-y:none;
+}
+.tnum{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+button{font-family:inherit;font-size:inherit;cursor:pointer;border:0;background:none;color:inherit}
+input,select,textarea{font-family:inherit;font-size:16px;color:var(--ink)}
+a{color:var(--green);text-underline-offset:2px}
+
+/* ---- header ---- */
+header{
+  position:sticky;top:0;z-index:40;background:var(--green);color:#fff;
+  padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px;
+  box-shadow:0 1px 8px rgba(15,40,25,.18);
+}
+.hdr-row{display:flex;align-items:center;gap:8px}
+.hdr-title{font-weight:700;font-size:15px;letter-spacing:.02em;white-space:nowrap;margin-right:auto;display:flex;align-items:center;gap:7px}
+.hdr-title .back{font-size:20px;margin:-4px 0 -4px -4px;padding:4px 6px;line-height:1}
+.farm-sel{
+  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);color:#fff;
+  border-radius:20px;padding:6px 30px 6px 12px;font-size:13px;font-weight:600;max-width:44vw;
+  text-overflow:ellipsis;overflow:hidden;white-space:nowrap;
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23fff' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 11px center;
+}
+.hdr-sub{display:flex;align-items:center;gap:10px;margin-top:7px;font-size:12px;color:rgba(255,255,255,.9)}
+.net-dot{display:inline-flex;align-items:center;gap:5px;font-weight:600}
+.net-dot i{width:8px;height:8px;border-radius:50%;background:#8ee6a8;display:inline-block}
+.net-dot.off i{background:#ffd27a}
+.basedate-btn{margin-left:auto;background:rgba(255,255,255,.16);border-radius:16px;padding:4px 11px;font-size:12px;font-weight:600;display:inline-flex;gap:6px;align-items:center}
+.basedate-btn.today-off{background:var(--amber);}
+
+/* ---- layout ---- */
+main{max-width:640px;margin:0 auto;padding:14px 14px calc(96px + var(--safe-b));}
+.section-h{font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--muted);margin:22px 2px 9px;text-transform:none}
+.section-h:first-child{margin-top:4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.card.pad{padding:15px}
+.stack>*+*{margin-top:11px}
+
+/* ---- home ---- */
+.jmr-hero{background:linear-gradient(160deg,#2c7351,#1c5038);color:#fff;border-radius:var(--r);padding:17px 18px;box-shadow:var(--shadow)}
+.jmr-hero .lbl{font-size:12px;letter-spacing:.06em;opacity:.85;font-weight:600}
+.jmr-hero .big{font-size:44px;font-weight:800;line-height:1;margin:6px 0 2px;letter-spacing:-.01em}
+.jmr-hero .big small{font-size:15px;font-weight:600;opacity:.8;margin-left:4px}
+.jmr-hero .split{display:flex;gap:18px;margin-top:12px;font-size:12.5px;opacity:.95}
+.jmr-hero .split b{font-size:18px;font-weight:700;display:block;letter-spacing:-.01em}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 15px;box-shadow:var(--shadow);text-align:left;display:flex;flex-direction:column;gap:2px;min-height:88px}
+.tile .n{font-size:32px;font-weight:800;line-height:1;letter-spacing:-.02em}
+.tile .t{font-size:13px;font-weight:600;color:var(--muted)}
+.tile .arrow{margin-top:auto;font-size:12px;color:var(--green);font-weight:600}
+.tile.alert .n{color:var(--amber)}
+.quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.qbtn{display:flex;align-items:center;gap:10px;padding:13px 14px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);font-weight:600;font-size:14px}
+.qbtn .ic{font-size:19px}
+
+/* ---- bottom nav ---- */
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:50;background:rgba(255,255,255,.94);
+  backdrop-filter:saturate(1.4) blur(8px);-webkit-backdrop-filter:saturate(1.4) blur(8px);
+  border-top:1px solid var(--line);display:flex;padding:6px 4px calc(6px + var(--safe-b));}
+.nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 2px;color:var(--faint);font-size:10.5px;font-weight:600;border-radius:10px}
+.nav button .ic{font-size:20px;line-height:1}
+.nav button.on{color:var(--green)}
+.nav button.on .ic{transform:translateY(-1px)}
+
+/* ---- buttons / forms ---- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:var(--green);color:#fff;border-radius:12px;padding:13px 16px;font-weight:700;font-size:15px;width:100%;box-shadow:var(--shadow)}
+.btn:active{background:var(--green-d)}
+.btn.sec{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.btn.ghost{background:transparent;color:var(--green);box-shadow:none;border:1px solid var(--green-l)}
+.btn.danger{background:var(--red)}
+.btn.sm{padding:9px 13px;font-size:13.5px;width:auto}
+.btn.wide{width:100%}
+.btn-row{display:flex;gap:9px}
+.btn-row>.btn{flex:1;width:auto}
+.field{margin-bottom:13px}
+.field>label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:5px}
+.field .hint{font-size:11.5px;color:var(--faint);margin-top:4px}
+input[type=text],input[type=number],input[type=date],input[type=search],select,textarea{
+  width:100%;background:#fbfcfb;border:1.5px solid var(--line);border-radius:11px;padding:12px 12px;outline:none;
+}
+select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235c6b62' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
+input:focus,select:focus,textarea:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px var(--green-l)}
+textarea{min-height:74px;resize:vertical;line-height:1.45}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:7px}
+.chip{padding:7px 12px;border:1.5px solid var(--line);border-radius:20px;font-size:13px;font-weight:600;background:#fbfcfb;color:var(--muted)}
+.chip.on{background:var(--green-l);border-color:var(--green);color:var(--green-d)}
+.seg{display:flex;background:var(--line2);border-radius:12px;padding:3px;gap:3px}
+.seg button{flex:1;padding:9px 6px;border-radius:9px;font-size:13px;font-weight:700;color:var(--muted)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+
+/* ---- JMR pill ---- */
+.pill{display:inline-flex;align-items:center;justify-content:center;min-width:46px;padding:4px 9px;border-radius:9px;font-weight:800;font-size:14px}
+.pill.g{background:var(--green-l);color:var(--green-d)}
+.pill.y{background:var(--yellow-bg);color:var(--yellow)}
+.pill.a{background:var(--amber-bg);color:var(--amber)}
+.pill.r{background:var(--red-bg);color:var(--red)}
+.pill.n{background:var(--line2);color:var(--faint)}
+.tag{display:inline-block;padding:2px 8px;border-radius:7px;font-size:11px;font-weight:700;background:var(--line2);color:var(--muted)}
+.tag.preg{background:var(--green-l);color:var(--green-d)}
+.tag.open{background:var(--amber-bg);color:var(--amber)}
+.tag.wait{background:#e7edf5;color:#3a5b86}
+.tag.none{background:var(--line2);color:var(--faint)}
+.tag.dry{background:#eee7f2;color:#6b4d86}
+.tag.heifer{background:#e9f2f0;color:var(--teal)}
+
+/* ---- cow rows ---- */
+.searchbar{position:relative;margin-bottom:12px}
+.searchbar input{padding-left:38px}
+.searchbar .si{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--faint);font-size:16px}
+.cow-row{display:flex;align-items:center;gap:12px;padding:13px 14px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);width:100%;text-align:left}
+.cow-row+.cow-row{margin-top:9px}
+.cow-row .id{flex:1;min-width:0}
+.cow-row .id .nm{font-weight:700;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cow-row .id .meta{font-size:12px;color:var(--muted);margin-top:2px;display:flex;flex-wrap:wrap;gap:6px}
+.cow-row .rt{text-align:right;flex-shrink:0}
+.cow-row .rt .sub{font-size:11px;color:var(--faint);margin-top:3px}
+.count-note{font-size:12px;color:var(--muted);margin:2px 2px 10px}
+
+/* ---- timeline / karte ---- */
+.karte-head{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px}
+.karte-head .top{display:flex;align-items:flex-start;gap:12px}
+.karte-head .nm{font-size:21px;font-weight:800}
+.karte-head .sub{font-size:12.5px;color:var(--muted);margin-top:2px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin-top:14px;font-size:13.5px}
+.kv dt{color:var(--muted);white-space:nowrap}
+.kv dd{margin:0;text-align:right;font-weight:600}
+.metric-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:12px}
+.metric{background:#fbfcfb;border:1px solid var(--line2);border-radius:11px;padding:10px;text-align:center}
+.metric .m{font-size:20px;font-weight:800;letter-spacing:-.02em}
+.metric .l{font-size:10.5px;color:var(--muted);margin-top:2px;font-weight:600}
+.tl{position:relative;margin-top:6px;padding-left:6px}
+.tl-item{position:relative;padding:12px 13px 12px 40px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.tl-item+.tl-item{margin-top:9px}
+.tl-item .dot{position:absolute;left:12px;top:15px;width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1.5px var(--line)}
+.tl-item .dt{font-size:12px;color:var(--muted);font-weight:600}
+.tl-item .ty{font-weight:700;font-size:14.5px;margin-top:1px;display:flex;align-items:center;gap:7px}
+.tl-item .body{font-size:13px;color:#40514a;margin-top:5px;line-height:1.5;white-space:pre-wrap}
+.tl-item .del{position:absolute;right:8px;top:8px;color:var(--faint);font-size:12px;padding:6px 8px}
+.dot.calving{background:#8b5cf6}.dot.AI{background:#2563eb}.dot.preg_check{background:#059669}.dot.exam{background:#d97706}.dot.dry_off{background:#6b7280}
+
+/* list detail cards */
+.list-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:13px 14px}
+.list-card+.list-card{margin-top:10px}
+.list-card .lc-top{display:flex;align-items:center;gap:10px}
+.list-card .lc-nm{font-weight:700;font-size:15.5px}
+.list-card .lc-days{margin-left:auto;text-align:right}
+.list-card .lc-days b{font-size:20px;font-weight:800}
+.list-card .lc-days span{font-size:10.5px;color:var(--muted);display:block}
+.list-card .lc-hist{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
+.list-card .lc-find{margin-top:9px;border-top:1px dashed var(--line);padding-top:10px}
+.expander-btn{margin-top:9px;font-size:13px;font-weight:700;color:var(--green);display:flex;align-items:center;gap:6px}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:13px 14px}
+.kpi .k-l{font-size:12px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:5px}
+.kpi .k-v{font-size:26px;font-weight:800;margin-top:5px;letter-spacing:-.02em}
+.kpi .k-v small{font-size:13px;font-weight:600;color:var(--muted);margin-left:2px}
+.kpi .k-n{font-size:11px;color:var(--faint);margin-top:3px}
+.warnbox{background:var(--amber-bg);border:1px solid #f0d9b0;border-radius:11px;padding:11px 13px;font-size:12.5px;color:#6b4408;line-height:1.5}
+.info{font-size:12.5px;color:var(--muted);line-height:1.55}
+
+/* chart */
+.chart-wrap{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:14px}
+canvas{display:block;width:100%;height:auto}
+
+/* export */
+.check{display:flex;align-items:center;gap:11px;padding:13px 4px;border-bottom:1px solid var(--line2)}
+.check:last-child{border-bottom:0}
+.check input{width:22px;height:22px;accent-color:var(--green);flex-shrink:0}
+.check .c-t{font-weight:600;font-size:14.5px}
+.check .c-s{font-size:11.5px;color:var(--faint)}
+
+/* misc */
+.empty{text-align:center;color:var(--faint);padding:40px 20px}
+.empty .e-ic{font-size:40px;opacity:.5}
+.empty .e-t{margin-top:10px;font-weight:600;color:var(--muted)}
+.fab{position:fixed;right:16px;bottom:calc(84px + var(--safe-b));z-index:45;background:var(--green);color:#fff;width:56px;height:56px;border-radius:18px;font-size:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(20,60,40,.28)}
+.toast{position:fixed;left:50%;bottom:calc(96px + var(--safe-b));transform:translateX(-50%) translateY(20px);z-index:80;background:#1b241f;color:#fff;padding:11px 18px;border-radius:24px;font-size:13.5px;font-weight:600;opacity:0;transition:.25s;box-shadow:0 6px 22px rgba(0,0,0,.25);pointer-events:none;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* modal (base date, dialogs) */
+.sheet-bg{position:fixed;inset:0;background:rgba(20,30,25,.4);z-index:90;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:.2s}
+.sheet-bg.show{opacity:1;pointer-events:auto}
+.sheet{background:var(--card);width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:18px 18px calc(20px + var(--safe-b));transform:translateY(30px);transition:.24s}
+.sheet-bg.show .sheet{transform:translateY(0)}
+.sheet h3{margin:0 0 14px;font-size:17px;font-weight:800}
+.divider{height:1px;background:var(--line2);margin:14px 0}
+.linkbtn{color:var(--green);font-weight:700;font-size:14px;padding:6px 0}
+
+@media print{
+  header,.nav,.fab,.no-print{display:none!important}
+  body{background:#fff}
+  main{max-width:none;padding:0}
+  .card,.list-card,.kpi,.chart-wrap,.cow-row{box-shadow:none;border-color:#ccc}
+  #print-area{display:block!important}
+}
+#print-area{display:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header id="hdr"></header>
+<main id="app"></main>
+<nav class="nav" id="nav"></nav>
+<div id="fab-slot"></div>
+<div class="sheet-bg" id="sheet-bg"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+<div id="print-area"></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   繁殖巡回 記録・閲覧 PWA — 単一ファイル・完全ローカル動作
+   データは端末の IndexedDB にのみ保存（外部送信なし）
+   ===================================================================== */
+
+/* ---------- 小道具 ---------- */
+const $ = (s,r=document)=>r.querySelector(s);
+const uid = ()=> (crypto.randomUUID? crypto.randomUUID() : 'id-'+Date.now()+'-'+Math.random().toString(16).slice(2));
+const esc = s => (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const DAY = 86400000;
+
+/* 日付は 'YYYY-MM-DD' 文字列で保存。差分計算はUTC正午基準でDSTの影響を排除 */
+function toD(s){ if(!s) return null; const [y,m,d]=s.split('-').map(Number); if(!y) return null; return new Date(Date.UTC(y,m-1,d,12)); }
+function fromD(dt){ const y=dt.getUTCFullYear(),m=String(dt.getUTCMonth()+1).padStart(2,'0'),d=String(dt.getUTCDate()).padStart(2,'0'); return `${y}-${m}-${d}`; }
+function todayStr(){ const n=new Date(); return fromD(new Date(Date.UTC(n.getFullYear(),n.getMonth(),n.getDate(),12))); }
+function daysBetween(a,b){ const A=toD(a),B=toD(b); if(!A||!B) return null; return Math.round((B-A)/DAY); }
+function addDays(s,n){ const d=toD(s); return d? fromD(new Date(d.getTime()+n*DAY)) : null; }
+function monthEnd(y,m){ return fromD(new Date(Date.UTC(y,m,0,12))); }      // m:1-12 → 月末
+function monthStart(y,m){ return fromD(new Date(Date.UTC(y,m-1,1,12))); }
+function fmtJ(s){ if(!s) return '—'; const [y,m,d]=s.split('-'); return `${y}/${m}/${d}`; }
+function fmtJShort(s){ if(!s) return '—'; const [,m,d]=s.split('-'); return `${+m}/${+d}`; }
+function num(v,dp=0){ if(v==null||isNaN(v)) return '—'; return Number(v).toFixed(dp); }
+
+/* =====================================================================
+   1. IndexedDB 層
+   ===================================================================== */
+const DB = (()=>{
+  let db=null;
+  const NAME='hanshoku_db', VER=1;
+  function open(){
+    return new Promise((res,rej)=>{
+      const req=indexedDB.open(NAME,VER);
+      req.onupgradeneeded=e=>{
+        const d=e.target.result;
+        if(!d.objectStoreNames.contains('farms')) d.createObjectStore('farms',{keyPath:'id'});
+        if(!d.objectStoreNames.contains('cows')){ const s=d.createObjectStore('cows',{keyPath:'id'}); s.createIndex('farmId','farmId'); }
+        if(!d.objectStoreNames.contains('events')){ const s=d.createObjectStore('events',{keyPath:'id'}); s.createIndex('cowId','cowId'); s.createIndex('farmId','farmId'); }
+        if(!d.objectStoreNames.contains('meta')) d.createObjectStore('meta',{keyPath:'k'});
+      };
+      req.onsuccess=e=>{ db=e.target.result; res(db); };
+      req.onerror=e=>rej(e.target.error);
+    });
+  }
+  function tx(store,mode='readonly'){ return db.transaction(store,mode).objectStore(store); }
+  function pr(r){ return new Promise((res,rej)=>{ r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+  return {
+    open,
+    getAll:(s)=>pr(tx(s).getAll()),
+    put:(s,v)=>pr(tx(s,'readwrite').put(v)),
+    del:(s,k)=>pr(tx(s,'readwrite').delete(k)),
+    get:(s,k)=>pr(tx(s).get(k)),
+    byIndex:(s,idx,val)=>pr(tx(s).index(idx).getAll(val)),
+    clear:(s)=>pr(tx(s,'readwrite').clear()),
+    putMany:async(s,arr)=>{ const t=db.transaction(s,'readwrite').objectStore(s); for(const v of arr){ t.put(v); } return new Promise((res,rej)=>{ t.transaction.oncomplete=res; t.transaction.onerror=()=>rej(t.transaction.error); }); },
+    metaGet:async(k)=>{ const r=await pr(tx('meta').get(k)); return r? r.v : null; },
+    metaSet:(k,v)=>pr(tx('meta','readwrite').put({k,v})),
+  };
+})();
+
+/* =====================================================================
+   既定値・定数
+   ===================================================================== */
+const DEFAULT_FARM = ()=>({
+  vwpFirst:80, vwpMulti:60, heiferBreedingAge:390, gestationDays:285,
+  cycleDays:21, openAiThreshold:40, pregCheckThreshold:28, lossPerDay:300
+});
+const EVENT_LABEL = {calving:'分娩', AI:'授精', preg_check:'妊娠鑑定', exam:'検診所見', dry_off:'乾乳'};
+const STATUS_LIST = ['在群','乾乳','出荷','淘汰'];
+const PREG_RESULTS = ['妊娠','不妊','再検'];
+const OVARY_SUGGEST = ['黄体','卵胞','静止','嚢腫','排卵前','小卵胞'];
+const UTERUS_SUGGEST = ['正常','貯留','子宮内膜炎','弛緩','充実'];
+
+/* =====================================================================
+   グローバル状態
+   ===================================================================== */
+const S = {
+  farms:[], farm:null,       // 現在の農場オブジェクト
+  cows:[], events:[],        // 現在農場ぶんをメモリに保持
+  view:'home', param:{}, back:null,
+  base:todayStr(),           // 基準日（検診日）
+  online:navigator.onLine,
+};
+const eventsByCow = id => S.events.filter(e=>e.cowId===id)
+  .sort((a,b)=> a.date<b.date?-1 : a.date>b.date?1 : (a.id<b.id?-1:1));
+
+async function loadFarm(farmId){
+  S.farm = S.farms.find(f=>f.id===farmId) || null;
+  if(!S.farm){ S.cows=[]; S.events=[]; return; }
+  S.cows = (await DB.byIndex('cows','farmId',farmId)) || [];
+  S.events = (await DB.byIndex('events','farmId',farmId)) || [];
+  await DB.metaSet('lastFarm', farmId);
+}
+
+/* =====================================================================
+   2. 計算ロジック
+   ===================================================================== */
+
+/* その牛の、指定日(base)時点・任意で upTo(この日まで) の状態 */
+function stateOf(cow, base=S.base, upTo=null){
+  const F=S.farm;
+  let evs = eventsByCow(cow.id);
+  if(upTo) evs = evs.filter(e=> e.date<=upTo);
+  const calvings = evs.filter(e=>e.type==='calving');
+  const ais      = evs.filter(e=>e.type==='AI');
+  const pcs      = evs.filter(e=>e.type==='preg_check');
+  const exams    = evs.filter(e=>e.type==='exam');
+  const parity = calvings.length;
+  const lastCalving = calvings.length? calvings[calvings.length-1].date : null;
+  const lastAI = ais.length? ais[ais.length-1].date : null;
+  const lastPC = pcs.length? pcs[pcs.length-1] : null;
+  // 乾乳中？（分娩／乾乳のうち最後が乾乳なら乾乳中）
+  const lastCD = [...evs].reverse().find(e=> e.type==='calving'||e.type==='dry_off');
+  const dried = !!(lastCD && lastCD.type==='dry_off');
+  // 妊否：最新の妊鑑が最新授精以降なら鑑定結果、そうでなければ授精後未確定／未授精
+  let preg='未授精';
+  if(lastPC && (!lastAI || lastPC.date>=lastAI)) preg=lastPC.result;
+  else if(lastAI) preg='未確定';
+  const isPreg = preg==='妊娠';
+  // 受胎授精日：妊娠確定妊鑑の日以前で最後の授精
+  let conceptionAI=null;
+  if(isPreg && lastPC){ const before=ais.filter(a=>a.date<=lastPC.date); conceptionAI = before.length? before[before.length-1].date : lastAI; }
+  const daysSinceCalving = lastCalving? daysBetween(lastCalving,base) : null;
+  const daysSinceAI = lastAI? daysBetween(lastAI,base) : null;
+  const age = cow.birthDate? daysBetween(cow.birthDate,base) : null;
+  const dueDate = (isPreg && conceptionAI)? addDays(conceptionAI, F.gestationDays) : null;
+  const lastBCS = (()=>{ for(let i=exams.length-1;i>=0;i--){ if(exams[i].bcs!=null&&exams[i].bcs!=='') return Number(exams[i].bcs); } return null; })();
+  return {parity,lastCalving,lastAI,lastPC,preg,isPreg,dried,conceptionAI,daysSinceCalving,daysSinceAI,age,dueDate,lastBCS,ais,pcs,calvings,exams};
+}
+
+/* 個体JMR（乾乳・出荷・淘汰は対象外→null）。値が小さいほど良い */
+function jmrOf(cow, base=S.base, upTo=null){
+  const F=S.farm;
+  if(!upTo && (cow.status==='乾乳'||cow.status==='出荷'||cow.status==='淘汰')) return null;
+  const st = stateOf(cow, base, upTo);
+  if(upTo && st.dried) return null;      // 履歴計算時の乾乳除外
+  if(st.isPreg) return 0;                // 妊娠確認済 → 0
+  if(st.parity>=1){
+    if(st.daysSinceCalving==null) return null;
+    const vwp = st.parity===1? F.vwpFirst : F.vwpMulti;   // 初産=vwpFirst / 経産=vwpMulti
+    return Math.max(0, st.daysSinceCalving - vwp);
+  }else{
+    if(!cow.birthDate) return null;                        // 未経産は生年月日必須
+    const start = addDays(cow.birthDate, F.heiferBreedingAge);  // 授精開始日齢の到達日
+    return Math.max(0, daysBetween(start, base));
+  }
+}
+
+/* 群JMR：pop = 'both'|'multi'|'heifer'。乾乳・出荷・淘汰は除外 */
+function herdJMR(base=S.base, pop='both', upTo=null){
+  let mSum=0,mN=0,hSum=0,hN=0;
+  for(const c of S.cows){
+    if(upTo){ if(c.birthDate && c.birthDate>upTo) continue; }
+    const st = stateOf(c, base, upTo);
+    const isHeifer = st.parity===0;
+    if(pop==='multi' && isHeifer) continue;
+    if(pop==='heifer' && !isHeifer) continue;
+    const j = jmrOf(c, base, upTo);
+    if(j==null) continue;
+    if(isHeifer){ hSum+=j; hN++; } else { mSum+=j; mN++; }
+  }
+  const n=mN+hN, sum=mSum+hSum;
+  return { avg: n? sum/n : null, n, multi:{avg:mN?mSum/mN:null,n:mN}, heifer:{avg:hN?hSum/hN:null,n:hN} };
+}
+
+/* JMR月別系列：直近 months ヶ月ぶんの各月末群JMR */
+function jmrMonthly(months=12, pop='both'){
+  const now = toD(S.base);
+  const out=[];
+  for(let i=months-1;i>=0;i--){
+    const d=new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth()-i+1, 0, 12));
+    const y=d.getUTCFullYear(), m=d.getUTCMonth()+1;
+    const end = fromD(d);
+    const base = end>S.base ? S.base : end;   // 未来月は基準日で止める
+    const r = herdJMR(base, pop, end);
+    out.push({label:`${String(y).slice(2)}/${m}`, y,m, value:r.avg, n:r.n, multi:r.multi.avg, heifer:r.heifer.avg, mN:r.multi.n, hN:r.heifer.n});
+  }
+  return out;
+}
+
+/* JMR → 色クラス */
+function jmrClass(j){ if(j==null) return 'n'; if(j===0) return 'g'; if(j<=21) return 'y'; if(j<=45) return 'a'; return 'r'; }
+
+/* 未授精リスト：未受胎 かつ 分娩後日数≥openAiThreshold かつ 最終分娩以降に授精なし（経産） */
+function openAiList(){
+  const F=S.farm;
+  return S.cows.filter(c=>c.status==='在群').map(c=>({c,st:stateOf(c)}))
+    .filter(({st})=> st.parity>=1 && !st.isPreg && st.daysSinceCalving!=null && st.daysSinceCalving>=F.openAiThreshold
+        && (!st.lastAI || st.lastAI < st.lastCalving))
+    .sort((a,b)=> b.st.daysSinceCalving - a.st.daysSinceCalving);
+}
+/* 妊鑑リスト：授精あり かつ 種付け後日数≥pregCheckThreshold かつ その授精への鑑定が未実施 */
+function pregCheckList(){
+  const F=S.farm;
+  return S.cows.filter(c=>c.status==='在群').map(c=>({c,st:stateOf(c)}))
+    .filter(({st})=> st.lastAI && st.daysSinceAI!=null && st.daysSinceAI>=F.pregCheckThreshold
+        && (!st.lastPC || st.lastPC.date < st.lastAI))   // 最新授精への鑑定が未実施
+    .sort((a,b)=> b.st.daysSinceAI - a.st.daysSinceAI);
+}
+
+/* 繁殖履歴の1行要約（リスト用） */
+function historyLine(st){
+  const p=[];
+  p.push(`産次${st.parity}`);
+  if(st.lastCalving) p.push(`分娩${fmtJShort(st.lastCalving)}`);
+  if(st.lastAI) p.push(`AI${fmtJShort(st.lastAI)}`);
+  if(st.lastPC) p.push(`鑑定${fmtJShort(st.lastPC.date)}(${st.lastPC.result})`);
+  return p.join(' ・ ');
+}
+
+/* -------- 2.3 KPI（群・期間集計）--------
+   ※定義は獣医師が最終確認・調整する前提。近似・仮定はコメント参照。 */
+function lactationsOf(cow){
+  const st = stateOf(cow, S.base);
+  const cals = st.calvings, ais = st.ais, pcs = st.pcs;
+  const F=S.farm, res=[];
+  for(let i=0;i<cals.length;i++){
+    const start=cals[i].date, end=(i+1<cals.length)? cals[i+1].date : null;
+    const inRange = d => d>start && (end? d<end : true);
+    const aisIn = ais.filter(a=>inRange(a.date));
+    const pcsIn = pcs.filter(p=>inRange(p.date));
+    const firstAI = aisIn.length? aisIn[0].date : null;
+    const daysToFirstAI = firstAI? daysBetween(start,firstAI) : null;
+    let conceived=false, conceptionAI=null;
+    const pregPC = pcsIn.find(p=>p.result==='妊娠');
+    if(pregPC){ conceived=true; const bf=aisIn.filter(a=>a.date<=pregPC.date); conceptionAI = bf.length? bf[bf.length-1].date : (aisIn.length?aisIn[aisIn.length-1].date:null); }
+    else if(end){ conceived=true; conceptionAI = aisIn.length? aisIn[aisIn.length-1].date : null; } // 次分娩あり=受胎とみなす
+    const daysOpen = (conceived&&conceptionAI)? daysBetween(start,conceptionAI) : null;
+    const calvingInterval = end? daysBetween(start,end) : null;
+    const servicesToConception = conceived? aisIn.filter(a=> !conceptionAI || a.date<=conceptionAI).length : null;
+    const firstServiceConceived = !!(conceived && conceptionAI && firstAI && conceptionAI===firstAI);
+    const vwp = (i===0)? F.vwpFirst : F.vwpMulti; // 概略：最初の泌乳=初産VWP
+    res.push({cowId:cow.id,start,end,aisIn,pcsIn,firstAI,daysToFirstAI,conceived,conceptionAI,daysOpen,calvingInterval,servicesToConception,firstServiceConceived,vwp});
+  }
+  return res;
+}
+function kpi(fromDt,toDt){
+  const F=S.farm;
+  const inP = d => (!fromDt||d>=fromDt) && (!toDt||d<=toDt);
+  let lacts=[];
+  for(const c of S.cows) lacts.push(...lactationsOf(c));
+  const lp = lacts.filter(l=> inP(l.start));  // 分娩日ベースで期間フィルタ
+
+  const mean = arr => arr.length? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+  const d2first = mean(lp.filter(l=>l.daysToFirstAI!=null).map(l=>l.daysToFirstAI));
+  const open = mean(lp.filter(l=>l.conceived&&l.daysOpen!=null).map(l=>l.daysOpen));
+  const ci = mean(lp.filter(l=>l.calvingInterval!=null).map(l=>l.calvingInterval));
+  const services = mean(lp.filter(l=>l.conceived&&l.servicesToConception!=null).map(l=>l.servicesToConception));
+
+  // 受胎率＝受胎数/授精数：期間内の授精イベント総数を分母
+  let aiCount=0, concCount=0, firstServN=0, firstServConc=0;
+  let actualHeats=0, expectedHeats=0;
+  for(const l of lp){
+    aiCount += l.aisIn.filter(a=>inP(a.date)).length;
+    if(l.conceived) concCount++;
+    if(l.firstAI){ firstServN++; if(l.firstServiceConceived) firstServConc++; }
+    // 発情発見率：VWP経過後、受胎or基準日までの窓 / cycleDays で期待発情数、実授精数を実発情数の近似
+    const winStart = addDays(l.start, l.vwp);
+    const winEnd = l.conceptionAI || S.base;
+    const wd = daysBetween(winStart, winEnd);
+    if(wd!=null && wd>0){ expectedHeats += Math.max(1, Math.floor(wd/F.cycleDays)); }
+    actualHeats += l.aisIn.filter(a=> a.date>=winStart).length;
+  }
+  const conceptionRate = aiCount? concCount/aiCount : null;
+  const firstConcRate = firstServN? firstServConc/firstServN : null;
+  const heatDetect = expectedHeats? actualHeats/expectedHeats : null;
+  const pregRate = (heatDetect!=null&&conceptionRate!=null)? heatDetect*conceptionRate : null;
+  const expectedCI = (open!=null)? open + F.gestationDays : null;
+  // 経済損失：空胎延長(=daysOpen−VWP,下限0)×損失単価
+  let lossDays=0;
+  for(const l of lp){ if(l.conceived&&l.daysOpen!=null) lossDays += Math.max(0, l.daysOpen - l.vwp); }
+  const econLoss = lossDays * (F.lossPerDay||0);
+
+  // 群の単純集計（現在の在群牛）
+  const herd = S.cows.filter(c=>c.status==='在群');
+  const parities = herd.map(c=>stateOf(c).parity);
+  const avgParity = mean(parities);
+  const bcsArr = herd.map(c=>stateOf(c).lastBCS).filter(v=>v!=null);
+  const avgBCS = mean(bcsArr);
+
+  return {d2first,open,ci,expectedCI,services,conceptionRate,firstConcRate,heatDetect,pregRate,econLoss,lossDays,
+          avgParity,headcount:herd.length,avgBCS,aiCount,concCount,bcsArr,nLact:lp.length};
+}
+
+/* =====================================================================
+   3. 画面描画
+   ===================================================================== */
+const app=$('#app'), hdr=$('#hdr'), nav=$('#nav'), fabSlot=$('#fab-slot');
+
+function go(view,param={}){ S.back=null; S.view=view; S.param=param; render(); window.scrollTo(0,0); }
+function push(view,param={}){ S.back={view:S.view,param:S.param}; S.view=view; S.param=param; render(); window.scrollTo(0,0); }
+function goBack(){ if(S.back){ const b=S.back; S.back=null; S.view=b.view; S.param=b.param; render(); } else go('home'); }
+
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* ---- ヘッダー ---- */
+function renderHeader(){
+  const pushed = !!S.back;
+  const title = ({home:'ホーム',farms:'農場管理',cows:'牛一覧',cow:'個体カルテ',event:'イベント入力',
+    openai:'未授精リスト',pregcheck:'妊鑑リスト',lists:'検診リスト',jmr:'JMR月別推移',kpi:'KPIダッシュボード',
+    dataio:'データ出力／バックアップ',farmEdit:'農場設定',cowEdit:'牛の登録・編集'})[S.view]||'繁殖巡回';
+  const todayOff = S.base!==todayStr();
+  hdr.innerHTML = `
+   <div class="hdr-row">
+     <div class="hdr-title">${pushed?`<button class="back" data-act="back">‹</button>`:''}<span>${esc(title)}</span></div>
+     ${S.farms.length? `<select class="farm-sel" id="farm-sel">${S.farms.map(f=>`<option value="${f.id}" ${f.id===S.farm?.id?'selected':''}>${esc(f.name)}</option>`).join('')}</select>`:''}
+   </div>
+   <div class="hdr-sub">
+     <span class="net-dot ${S.online?'':'off'}"><i></i>${S.online?'オンライン':'オフライン'}</span>
+     <button class="basedate-btn ${todayOff?'today-off':''}" data-act="basedate">📅 検診日 ${fmtJ(S.base)}${todayOff?' (当日以外)':''}</button>
+   </div>`;
+}
+
+/* ---- ボトムナビ ---- */
+function renderNav(){
+  const items=[['home','🏠','ホーム'],['cows','🐄','牛一覧'],['lists','📋','リスト'],['metrics','📈','指標'],['dataio','💾','データ']];
+  const cur = ({openai:'lists',pregcheck:'lists',jmr:'metrics',kpi:'metrics',cow:'cows',cowEdit:'cows',event:'cows',farms:'home',farmEdit:'home'})[S.view]||S.view;
+  nav.innerHTML = items.map(([v,ic,t])=>`<button class="${cur===v?'on':''}" data-nav="${v}"><span class="ic">${ic}</span>${t}</button>`).join('');
+}
+
+/* ---- ルート描画 ---- */
+function render(){
+  renderHeader(); renderNav(); fabSlot.innerHTML='';
+  const v=S.view;
+  if(v==='home') return renderHome();
+  if(v==='farms') return renderFarms();
+  if(v==='farmEdit') return renderFarmEdit();
+  if(v==='cows') return renderCows();
+  if(v==='cow') return renderCow();
+  if(v==='cowEdit') return renderCowEdit();
+  if(v==='event') return renderEvent();
+  if(v==='lists'||v==='openai') return renderList('openai');
+  if(v==='pregcheck') return renderList('pregcheck');
+  if(v==='metrics'||v==='jmr') return renderJMR();
+  if(v==='kpi') return renderKPI();
+  if(v==='dataio') return renderDataIO();
+  app.innerHTML='<div class="empty">画面が見つかりません</div>';
+}
+
+/* ---------- ホーム ---------- */
+function renderHome(){
+  if(!S.farm){ return renderNoFarm(); }
+  const oa=openAiList(), pc=pregCheckList(), h=herdJMR();
+  const hcls = jmrClass(h.avg==null?null:Math.round(h.avg));
+  app.innerHTML = `
+    <div class="jmr-hero">
+      <div class="lbl">現在の群JMR（在群・${h.n}頭）</div>
+      <div class="big tnum">${h.avg==null?'—':num(h.avg,1)}<small>ペナルティ平均</small></div>
+      <div class="split">
+        <div>経産 <b class="tnum">${h.multi.avg==null?'—':num(h.multi.avg,1)}</b>${h.multi.n}頭</div>
+        <div>未経産 <b class="tnum">${h.heifer.avg==null?'—':num(h.heifer.avg,1)}</b>${h.heifer.n}頭</div>
+      </div>
+    </div>
+
+    <div class="section-h">本日の検診対象</div>
+    <div class="tiles">
+      <button class="tile ${oa.length?'alert':''}" data-nav="lists" data-tab="openai">
+        <div class="n tnum">${oa.length}</div><div class="t">未授精リスト</div><div class="arrow">対象を見る ›</div>
+      </button>
+      <button class="tile ${pc.length?'alert':''}" data-act="opentab" data-tab="pregcheck">
+        <div class="n tnum">${pc.length}</div><div class="t">妊鑑リスト</div><div class="arrow">対象を見る ›</div>
+      </button>
+    </div>
+
+    <div class="section-h">クイック操作</div>
+    <div class="quick-grid">
+      <button class="qbtn" data-nav="cows"><span class="ic">🐄</span>牛を探して記録</button>
+      <button class="qbtn" data-act="quickadd"><span class="ic">➕</span>新しい牛を登録</button>
+      <button class="qbtn" data-nav="metrics"><span class="ic">📈</span>JMR・KPI</button>
+      <button class="qbtn" data-nav="dataio"><span class="ic">💾</span>出力・バックアップ</button>
+    </div>
+
+    <div class="section-h">農場</div>
+    <div class="card pad" style="display:flex;align-items:center;gap:12px">
+      <div style="flex:1"><div style="font-weight:700">${esc(S.farm.name)}</div>
+      <div class="info" style="margin-top:3px">在群 ${S.cows.filter(c=>c.status==='在群').length}頭 ・ VWP 初産${S.farm.vwpFirst}/経産${S.farm.vwpMulti}日</div></div>
+      <button class="btn sec sm" data-act="farmsettings">設定</button>
+    </div>
+    <div style="margin-top:11px"><button class="linkbtn" data-nav="home" data-act="managefarms">＋ 農場の追加・切り替え</button></div>
+  `;
+}
+
+function renderNoFarm(){
+  app.innerHTML=`
+   <div class="empty" style="padding-top:30px">
+     <div class="e-ic">🚜</div>
+     <div class="e-t">まずは農場を登録しましょう</div>
+     <div class="info" style="margin-top:6px">巡回する酪農場ごとに繁殖パラメータ（VWP等）を設定できます。</div>
+   </div>
+   <button class="btn" style="margin-top:16px" data-act="newfarm">＋ 農場を追加</button>
+   <div class="card pad" style="margin-top:22px">
+     <div class="info">データはこの端末内（IndexedDB）にのみ保存され、外部に送信されません。iOSはストレージを破棄することがあるため、<b>定期的にデータ画面でJSONバックアップ</b>を取ってください。</div>
+   </div>`;
+}
+
+/* ---------- 農場管理 ---------- */
+function renderFarms(){
+  app.innerHTML = `
+    <div class="section-h">農場一覧</div>
+    <div class="stack">
+    ${S.farms.map(f=>`
+      <button class="cow-row" data-act="editfarm" data-id="${f.id}">
+        <div class="id"><div class="nm">${esc(f.name)}</div>
+          <div class="meta"><span>VWP 初${f.vwpFirst}/経${f.vwpMulti}日</span><span>授精開始${f.heiferBreedingAge}日齢</span><span>妊娠${f.gestationDays}日</span></div>
+        </div><div class="rt">›</div>
+      </button>`).join('') || '<div class="empty"><div class="e-t">農場がありません</div></div>'}
+    </div>
+    <button class="btn" style="margin-top:16px" data-act="newfarm">＋ 農場を追加</button>`;
+}
+
+function renderFarmEdit(){
+  const editing = S.param.id? S.farms.find(f=>f.id===S.param.id) : null;
+  const f = editing || DEFAULT_FARM();
+  const nf = (k,label,hint='')=>`<div class="field"><label>${label}</label><input type="number" id="f_${k}" inputmode="numeric" value="${f[k]}">${hint?`<div class="hint">${hint}</div>`:''}</div>`;
+  app.innerHTML = `
+    <div class="card pad stack">
+      <div class="field"><label>農場名</label><input type="text" id="f_name" value="${esc(editing?f.name:'')}" placeholder="例：〇〇牧場"></div>
+      <div class="section-h" style="margin-top:6px">繁殖パラメータ（この農場のみに適用）</div>
+      <div class="row2">${nf('vwpFirst','初産VWP（日）')}${nf('vwpMulti','経産VWP（日）')}</div>
+      <div class="row2">${nf('heiferBreedingAge','未経産の授精開始日齢（日）','未経産JMRの起点')}${nf('gestationDays','妊娠期間（日）','分娩予定日の算出')}</div>
+      <div class="row2">${nf('cycleDays','発情周期（日）')}${nf('lossPerDay','1日あたり損失額（円）','経済損失KPIに使用')}</div>
+      <div class="row2">${nf('openAiThreshold','未授精リスト閾値（分娩後◯日〜）')}${nf('pregCheckThreshold','妊鑑リスト閾値（授精後◯日〜）')}</div>
+    </div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn" data-act="savefarm">${editing?'保存':'農場を作成'}</button>
+    </div>
+    ${editing?`<button class="btn danger wide" style="margin-top:11px" data-act="delfarm" data-id="${f.id}">この農場を削除</button>`:''}`;
+}
+
+/* ---------- 牛一覧 ---------- */
+let cowFilter={q:'',status:'在群'};
+function renderCows(){
+  if(!S.farm) return renderNoFarm();
+  const q=cowFilter.q.trim().toLowerCase();
+  let list=S.cows.filter(c=>{
+    if(cowFilter.status!=='all' && c.status!==cowFilter.status) return false;
+    if(q){ const hay=`${c.name||''} ${c.tagNo||''} ${c.cowNo||''} ${c.kyosaiNo||''}`.toLowerCase(); if(!hay.includes(q)) return false; }
+    return true;
+  });
+  list.sort((a,b)=> (a.name||'').localeCompare(b.name||'','ja'));
+  const statuses=['在群','乾乳','出荷','淘汰','all'];
+  app.innerHTML = `
+    <div class="searchbar"><span class="si">🔍</span><input type="search" id="cow-q" placeholder="名前・番号で検索" value="${esc(cowFilter.q)}"></div>
+    <div class="seg" style="margin-bottom:12px">${statuses.map(s=>`<button data-fstatus="${s}" class="${cowFilter.status===s?'on':''}">${s==='all'?'全て':s}</button>`).join('')}</div>
+    <div class="count-note">${list.length}頭</div>
+    <div class="stack">
+    ${list.map(c=>{ const st=stateOf(c); const j=jmrOf(c); return `
+      <button class="cow-row" data-act="opencow" data-id="${c.id}">
+        <div class="id">
+          <div class="nm">${esc(c.name||'(無名)')} <span class="tnum" style="color:var(--muted);font-weight:600;font-size:13px">${esc(c.tagNo||'')}</span></div>
+          <div class="meta">${pregTag(st,c)} ${st.parity>=1?`<span>産次${st.parity}</span>`:'<span class="tag heifer">未経産</span>'} ${st.daysSinceCalving!=null?`<span>分娩後${st.daysSinceCalving}日</span>`:''}</div>
+        </div>
+        <div class="rt"><span class="pill ${jmrClass(j)} tnum">${j==null?'—':j}</span><div class="sub">JMR</div></div>
+      </button>`; }).join('') || '<div class="empty"><div class="e-ic">🐄</div><div class="e-t">該当する牛がいません</div></div>'}
+    </div>`;
+  fabSlot.innerHTML=`<button class="fab" data-act="quickadd" aria-label="牛を追加">＋</button>`;
+}
+function pregTag(st,c){
+  if(c && (c.status==='乾乳')) return '<span class="tag dry">乾乳</span>';
+  if(st.isPreg) return '<span class="tag preg">妊娠</span>';
+  if(st.preg==='未確定') return '<span class="tag wait">授精後</span>';
+  if(st.preg==='不妊'||st.preg==='再検') return `<span class="tag open">${st.preg}</span>`;
+  if(st.parity>=1||st.lastAI) return '<span class="tag open">未受胎</span>';
+  return '<span class="tag none">未授精</span>';
+}
+
+/* ---------- 牛の登録・編集 ---------- */
+function renderCowEdit(){
+  const editing = S.param.id? S.cows.find(c=>c.id===S.param.id) : null;
+  const c = editing || {name:'',tagNo:'',cowNo:'',kyosaiNo:'',birthDate:'',status:'在群',note:''};
+  app.innerHTML=`
+    <div class="card pad stack">
+      <div class="row2">
+        <div class="field"><label>識別名</label><input type="text" id="c_name" value="${esc(c.name)}" placeholder="例：かれん"></div>
+        <div class="field"><label>識別番号</label><input type="text" id="c_tagNo" value="${esc(c.tagNo)}" placeholder="例：2851"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>牛番号（任意）</label><input type="text" id="c_cowNo" value="${esc(c.cowNo)}"></div>
+        <div class="field"><label>共済番号（任意）</label><input type="text" id="c_kyosaiNo" value="${esc(c.kyosaiNo)}"></div>
+      </div>
+      <div class="field"><label>生年月日 <span style="color:var(--amber)">（未経産JMRに必須）</span></label><input type="date" id="c_birthDate" value="${esc(c.birthDate)}"></div>
+      <div class="field"><label>状態</label><select id="c_status">${STATUS_LIST.map(s=>`<option ${c.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="field"><label>備考</label><textarea id="c_note" placeholder="前歴など">${esc(c.note)}</textarea></div>
+    </div>
+    <div class="btn-row" style="margin-top:16px"><button class="btn" data-act="savecow">${editing?'保存':'牛を登録'}</button></div>
+    ${editing?`<button class="btn danger wide" style="margin-top:11px" data-act="delcow" data-id="${c.id}">この牛を削除（履歴も削除）</button>`:''}`;
+}
+
+/* ---------- 個体カルテ ---------- */
+function renderCow(){
+  const c=S.cows.find(x=>x.id===S.param.id);
+  if(!c){ app.innerHTML='<div class="empty">牛が見つかりません</div>'; return; }
+  const st=stateOf(c), j=jmrOf(c);
+  const evs=eventsByCow(c.id).slice().reverse();
+  const vwp = st.parity===1? S.farm.vwpFirst : (st.parity>=2? S.farm.vwpMulti : null);
+  app.innerHTML=`
+    <div class="karte-head">
+      <div class="top">
+        <div style="flex:1">
+          <div class="nm">${esc(c.name||'(無名)')} <span class="tnum" style="font-size:15px;color:var(--muted)">${esc(c.tagNo||'')}</span></div>
+          <div class="sub">${st.parity>=1?`経産 産次${st.parity}`:'未経産'} ・ ${esc(c.status)} ${c.cowNo?` ・ 牛番号${esc(c.cowNo)}`:''}</div>
+        </div>
+        <div style="text-align:center"><span class="pill ${jmrClass(j)} tnum" style="font-size:19px;min-width:56px;padding:7px 12px">${j==null?'—':j}</span><div class="sub" style="text-align:center;margin-top:3px">個体JMR</div></div>
+      </div>
+      <dl class="kv">
+        <dt>妊否</dt><dd>${pregTag(st,c)} ${st.dueDate?`<span class="tnum" style="color:var(--muted);font-weight:600">分娩予定 ${fmtJ(st.dueDate)}</span>`:''}</dd>
+        ${c.birthDate?`<dt>生年月日 / 日齢</dt><dd class="tnum">${fmtJ(c.birthDate)} / ${st.age!=null?st.age+'日':'—'}</dd>`:''}
+        ${st.lastCalving?`<dt>最終分娩</dt><dd class="tnum">${fmtJ(st.lastCalving)}（分娩後${st.daysSinceCalving}日）</dd>`:''}
+        ${st.lastAI?`<dt>最終授精</dt><dd class="tnum">${fmtJ(st.lastAI)}（${st.daysSinceAI}日前）</dd>`:''}
+        ${vwp!=null?`<dt>適用VWP</dt><dd class="tnum">${vwp}日</dd>`:''}
+        ${c.kyosaiNo?`<dt>共済番号</dt><dd class="tnum">${esc(c.kyosaiNo)}</dd>`:''}
+      </dl>
+      ${c.note?`<div class="info" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line2)">📝 ${esc(c.note)}</div>`:''}
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn sm" style="flex:1" data-act="addevent" data-id="${c.id}">＋ イベント追加</button>
+        <button class="btn sec sm" data-act="editcow" data-id="${c.id}">編集</button>
+      </div>
+    </div>
+
+    <div class="section-h">イベント履歴（${evs.length}件）</div>
+    <div class="tl">
+    ${evs.map(e=>renderTLItem(e)).join('') || '<div class="empty"><div class="e-t">イベントがありません</div></div>'}
+    </div>`;
+}
+function renderTLItem(e){
+  let body='';
+  if(e.type==='AI') body=[e.sire?`種雄牛：${esc(e.sire)}`:'', e.method&&e.method!=='AI'?`方式：${esc(e.method)}`:'', e.semenType?`精液：${esc(e.semenType)}`:''].filter(Boolean).join(' / ');
+  else if(e.type==='preg_check') body=`結果：${esc(e.result||'')}`;
+  else if(e.type==='exam') body=[e.leftOvary?`左卵巣：${esc(e.leftOvary)}`:'',e.rightOvary?`右卵巣：${esc(e.rightOvary)}`:'',e.uterus?`子宮：${esc(e.uterus)}`:'',(e.bcs!=null&&e.bcs!=='')?`BCS：${esc(e.bcs)}`:'',e.treatment?`処置：${esc(e.treatment)}`:'',e.instruction?`指示：${esc(e.instruction)}`:''].filter(Boolean).join('\n');
+  if(e.note) body += (body?'\n':'')+`備考：${esc(e.note)}`;
+  return `<div class="tl-item">
+    <span class="dot ${e.type}"></span>
+    <div class="dt tnum">${fmtJ(e.date)}</div>
+    <div class="ty">${EVENT_LABEL[e.type]}</div>
+    ${body?`<div class="body">${body}</div>`:''}
+    <button class="del" data-act="delevent" data-id="${e.id}">削除</button>
+  </div>`;
+}
+
+/* ---------- イベント入力 ---------- */
+let evForm={type:'exam'};
+function renderEvent(){
+  const c=S.cows.find(x=>x.id===S.param.cowId);
+  if(!c){ app.innerHTML='<div class="empty">牛が見つかりません</div>'; return; }
+  const t=evForm.type;
+  const types=[['exam','検診所見'],['AI','授精'],['preg_check','妊娠鑑定'],['calving','分娩'],['dry_off','乾乳']];
+  let fields='';
+  if(t==='AI') fields=`
+    <div class="field"><label>種雄牛</label><input type="text" id="e_sire" placeholder="種雄牛名／番号"></div>
+    <div class="field"><label>方式</label><div class="seg"><button type="button" class="seg-pick on" data-seg="method" data-v="AI">AI（人工授精）</button><button type="button" class="seg-pick" data-seg="method" data-v="ET">ET（受精卵移植）</button></div><input type="hidden" id="e_method" value="AI"></div>
+    <div class="field"><label>精液種別（任意）</label><select id="e_semenType"><option value="">—</option><option>通常</option><option>性判別</option><option>受精卵</option></select></div>`;
+  else if(t==='preg_check') fields=`
+    <div class="field"><label>結果</label><div class="chips" id="pc-chips">${PREG_RESULTS.map((r,i)=>`<button type="button" class="chip ${i===0?'on':''}" data-pc="${r}">${r}</button>`).join('')}</div><input type="hidden" id="e_result" value="妊娠"></div>`;
+  else if(t==='exam') fields=`
+    <div class="row2">
+      <div class="field"><label>左卵巣</label><input type="text" id="e_leftOvary" list="ovary-sug" placeholder="所見"></div>
+      <div class="field"><label>右卵巣</label><input type="text" id="e_rightOvary" list="ovary-sug" placeholder="所見"></div>
+    </div>
+    <div class="field"><label>子宮</label><input type="text" id="e_uterus" list="uterus-sug" placeholder="所見"></div>
+    <div class="field"><label>BCS</label><input type="number" id="e_bcs" inputmode="decimal" step="0.25" min="1" max="5" placeholder="例：3.0"></div>
+    <div class="field"><label>処置</label><textarea id="e_treatment" placeholder="処置内容"></textarea></div>
+    <div class="field"><label>指示</label><textarea id="e_instruction" placeholder="指示内容"></textarea></div>
+    <datalist id="ovary-sug">${OVARY_SUGGEST.map(o=>`<option value="${o}">`).join('')}</datalist>
+    <datalist id="uterus-sug">${UTERUS_SUGGEST.map(o=>`<option value="${o}">`).join('')}</datalist>`;
+
+  app.innerHTML=`
+    <div class="card pad" style="margin-bottom:12px;display:flex;align-items:center;gap:10px">
+      <div style="font-weight:700">${esc(c.name||'(無名)')} <span class="tnum" style="color:var(--muted);font-size:13px">${esc(c.tagNo||'')}</span></div>
+    </div>
+    <div class="field"><label>イベント種別</label>
+      <div class="chips">${types.map(([v,l])=>`<button type="button" class="chip ${t===v?'on':''}" data-etype="${v}">${l}</button>`).join('')}</div>
+    </div>
+    <div class="card pad stack">
+      <div class="field"><label>日付</label><input type="date" id="e_date" value="${S.base}"></div>
+      ${fields}
+      <div class="field"><label>備考</label><textarea id="e_note" placeholder="メモ（任意）"></textarea></div>
+    </div>
+    <button class="btn" style="margin-top:16px" data-act="saveevent" data-id="${c.id}">記録する</button>`;
+}
+
+/* ---------- リスト（未授精／妊鑑） ---------- */
+let listTab='openai', openFind=new Set();
+function renderList(tab){ listTab = (S.view==='pregcheck')?'pregcheck':(S.param.tab||tab||listTab);
+  const isOA = listTab==='openai';
+  const rows = isOA? openAiList() : pregCheckList();
+  app.innerHTML=`
+    <div class="seg" style="margin-bottom:14px">
+      <button data-listtab="openai" class="${isOA?'on':''}">未授精 (${openAiList().length})</button>
+      <button data-listtab="pregcheck" class="${!isOA?'on':''}">妊鑑 (${pregCheckList().length})</button>
+    </div>
+    <div class="info" style="margin-bottom:12px">${isOA
+      ? `未受胎かつ分娩後 ${S.farm.openAiThreshold}日以上、最終分娩以降に授精なしの牛`
+      : `最終授精から ${S.farm.pregCheckThreshold}日以上経過し、その授精への鑑定が未実施の牛`}</div>
+    ${rows.map(({c,st})=>renderListCard(c,st,isOA)).join('') || '<div class="empty"><div class="e-ic">✅</div><div class="e-t">対象の牛はいません</div></div>'}`;
+}
+function renderListCard(c,st,isOA){
+  const days = isOA? st.daysSinceCalving : st.daysSinceAI;
+  const open = openFind.has(c.id);
+  return `<div class="list-card">
+    <div class="lc-top">
+      <button data-act="opencow" data-id="${c.id}" style="text-align:left;flex:1">
+        <div class="lc-nm">${esc(c.name||'(無名)')} <span class="tnum" style="color:var(--muted);font-size:12.5px">${esc(c.tagNo||'')}</span></div>
+      </button>
+      <div class="lc-days"><b class="tnum">${days}</b><span>${isOA?'分娩後日数':'種付け後日数'}</span></div>
+    </div>
+    <div class="lc-hist">${historyLine(st)}</div>
+    ${st.lastPC && !isOA?'':''}
+    <button class="expander-btn" data-act="togglefind" data-id="${c.id}">${open?'▲ 所見入力を閉じる':'▼ ここで所見を入力'}</button>
+    ${open?`<div class="lc-find" id="find-${c.id}">
+      <div class="row2">
+        <div class="field" style="margin-bottom:9px"><label>左卵巣</label><input type="text" id="lf_left_${c.id}" list="ovary-sug2" placeholder="所見"></div>
+        <div class="field" style="margin-bottom:9px"><label>右卵巣</label><input type="text" id="lf_right_${c.id}" list="ovary-sug2" placeholder="所見"></div>
+      </div>
+      <div class="field" style="margin-bottom:9px"><label>子宮</label><input type="text" id="lf_uterus_${c.id}" list="uterus-sug2" placeholder="所見"></div>
+      <div class="row2">
+        <div class="field" style="margin-bottom:9px"><label>処置</label><input type="text" id="lf_treat_${c.id}" placeholder="処置"></div>
+        <div class="field" style="margin-bottom:9px"><label>指示</label><input type="text" id="lf_instr_${c.id}" placeholder="指示"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn sm" style="flex:1" data-act="savefind" data-id="${c.id}">検診所見を記録</button>
+        ${isOA?`<button class="btn sec sm" data-act="quickai" data-id="${c.id}">授精を記録</button>`
+              :`<button class="btn sec sm" data-act="quickpc" data-id="${c.id}">妊鑑を記録</button>`}
+      </div>
+      <datalist id="ovary-sug2">${OVARY_SUGGEST.map(o=>`<option value="${o}">`).join('')}</datalist>
+      <datalist id="uterus-sug2">${UTERUS_SUGGEST.map(o=>`<option value="${o}">`).join('')}</datalist>
+    </div>`:''}
+  </div>`;
+}
+
+/* ---------- JMR月別推移 ---------- */
+let jmrOpt={months:12,pop:'both'};
+function renderJMR(){
+  if(!S.farm) return renderNoFarm();
+  const series=jmrMonthly(jmrOpt.months, jmrOpt.pop);
+  app.innerHTML=`
+    <div class="seg" style="margin-bottom:12px">
+      <button data-metrictab="jmr" class="on">JMR推移</button>
+      <button data-metrictab="kpi">KPI</button>
+    </div>
+    <div class="section-h">母集団</div>
+    <div class="seg" style="margin-bottom:12px">
+      ${[['both','両方'],['multi','経産'],['heifer','未経産']].map(([v,l])=>`<button data-jpop="${v}" class="${jmrOpt.pop===v?'on':''}">${l}</button>`).join('')}
+    </div>
+    <div class="section-h">期間</div>
+    <div class="seg" style="margin-bottom:14px">
+      ${[[6,'6ヶ月'],[12,'12ヶ月'],[24,'24ヶ月']].map(([v,l])=>`<button data-jmonths="${v}" class="${jmrOpt.months===v?'on':''}">${l}</button>`).join('')}
+    </div>
+    <div class="chart-wrap"><canvas id="jmr-canvas"></canvas></div>
+    <button class="btn ghost wide" style="margin-top:12px" data-act="exportjmrpng">🖼 グラフをPNG画像で書き出す</button>
+    <div class="section-h">月別の値</div>
+    <div class="card" style="overflow:hidden">
+      ${series.map((p,i)=>`<div style="display:flex;padding:10px 14px;${i? 'border-top:1px solid var(--line2)':''};align-items:center">
+        <div style="flex:1;font-weight:600" class="tnum">${p.label}</div>
+        <div class="tnum" style="color:var(--muted);font-size:13px;margin-right:14px">${p.n}頭</div>
+        <div class="pill ${jmrClass(p.value==null?null:Math.round(p.value))} tnum">${p.value==null?'—':num(p.value,1)}</div>
+      </div>`).join('')}
+    </div>`;
+  requestAnimationFrame(()=>drawLine($('#jmr-canvas'), series));
+}
+
+/* 折れ線グラフ（外部ライブラリ非依存・canvas直描画） */
+function drawLine(canvas, series, forExport){
+  if(!canvas) return;
+  const dpr=window.devicePixelRatio||1;
+  const cssW = forExport? 900 : (canvas.parentElement.clientWidth-28);
+  const cssH = forExport? 460 : 240;
+  canvas.width=cssW*dpr; canvas.height=cssH*dpr;
+  canvas.style.width=cssW+'px'; canvas.style.height=cssH+'px';
+  const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,cssW,cssH); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,cssW,cssH);
+  const padL=40,padR=14,padT=forExport?40:16,padB=34;
+  const w=cssW-padL-padR, h=cssH-padT-padB;
+  const vals=series.map(p=>p.value).filter(v=>v!=null);
+  let maxV = vals.length? Math.max(...vals):10; maxV=Math.max(10, Math.ceil(maxV/10)*10);
+  const x=i=> padL + (series.length<=1?0.5:i/(series.length-1))*w;
+  const y=v=> padT + h - (v/maxV)*h;
+  if(forExport){ ctx.fillStyle='#1b241f'; ctx.font='bold 20px sans-serif'; ctx.fillText('群JMR 月別推移',padL,26); }
+  // grid + y labels
+  ctx.strokeStyle='#eef0eb'; ctx.fillStyle='#8a988f'; ctx.font=(forExport?'13px':'10px')+' sans-serif'; ctx.textAlign='right';
+  for(let g=0;g<=4;g++){ const val=maxV*g/4, yy=y(val); ctx.beginPath(); ctx.moveTo(padL,yy); ctx.lineTo(cssW-padR,yy); ctx.stroke(); ctx.fillText(String(Math.round(val)), padL-6, yy+3); }
+  // x labels
+  ctx.textAlign='center'; ctx.fillStyle='#8a988f';
+  const step=Math.ceil(series.length/(forExport?12:6));
+  series.forEach((p,i)=>{ if(i%step===0||i===series.length-1){ ctx.fillText(p.label, x(i), cssH-12); } });
+  // line
+  ctx.strokeStyle='#276749'; ctx.lineWidth=forExport?3:2.4; ctx.lineJoin='round'; ctx.beginPath();
+  let started=false;
+  series.forEach((p,i)=>{ if(p.value==null){ started=false; return; } const px=x(i),py=y(p.value); if(!started){ ctx.moveTo(px,py); started=true; } else ctx.lineTo(px,py); });
+  ctx.stroke();
+  // points
+  ctx.fillStyle='#276749';
+  series.forEach((p,i)=>{ if(p.value==null) return; ctx.beginPath(); ctx.arc(x(i),y(p.value),forExport?4.5:3.2,0,7); ctx.fill(); });
+  return canvas;
+}
+
+/* ---------- KPIダッシュボード ---------- */
+let kpiRange={from:'',to:''};
+function renderKPI(){
+  if(!S.farm) return renderNoFarm();
+  if(!kpiRange.to){ kpiRange.to=S.base; kpiRange.from=addDays(S.base,-365); }
+  const k=kpi(kpiRange.from,kpiRange.to);
+  const card=(label,val,unit,note,dp=0)=>`<div class="kpi"><div class="k-l">${label}</div><div class="k-v tnum">${val==null?'—':num(val,dp)}<small>${unit||''}</small></div>${note?`<div class="k-n">${note}</div>`:''}</div>`;
+  app.innerHTML=`
+    <div class="seg" style="margin-bottom:12px">
+      <button data-metrictab="jmr">JMR推移</button>
+      <button data-metrictab="kpi" class="on">KPI</button>
+    </div>
+    <div class="card pad" style="margin-bottom:12px">
+      <div class="row2">
+        <div class="field" style="margin-bottom:0"><label>期間 開始</label><input type="date" id="kpi-from" value="${kpiRange.from}"></div>
+        <div class="field" style="margin-bottom:0"><label>期間 終了</label><input type="date" id="kpi-to" value="${kpiRange.to}"></div>
+      </div>
+      <div class="info" style="margin-top:8px">分娩日がこの期間の泌乳をもとに集計（対象 ${k.nLact}泌乳・在群${k.headcount}頭）</div>
+    </div>
+    <div class="kpi-grid">
+      ${card('初回授精日数',k.d2first,'日','分娩→初回AIの平均')}
+      ${card('実空胎日数',k.open,'日','分娩→受胎AIの平均')}
+      ${card('分娩間隔',k.ci,'日','連続分娩の平均')}
+      ${card('期待分娩間隔',k.expectedCI,'日','空胎+妊娠期間')}
+      ${card('授精回数/受胎',k.services,'回','受胎までの平均',1)}
+      ${card('受胎率',k.conceptionRate==null?null:k.conceptionRate*100,'%',`受胎${k.concCount}/授精${k.aiCount}`,1)}
+      ${card('初回受胎率',k.firstConcRate==null?null:k.firstConcRate*100,'%','初回AIで受胎',1)}
+      ${card('発情発見率',k.heatDetect==null?null:k.heatDetect*100,'%','実授精/期待発情',1)}
+      ${card('妊娠率',k.pregRate==null?null:k.pregRate*100,'%','発見率×受胎率',1)}
+      ${card('平均産次',k.avgParity,'産','在群平均',1)}
+      ${card('平均BCS',k.avgBCS,'','直近検診より',1)}
+      ${card('頭数',k.headcount,'頭','在群')}
+    </div>
+    <div class="kpi" style="margin-top:11px">
+      <div class="k-l">経済損失（推定）</div>
+      <div class="k-v tnum" style="color:var(--amber)">¥${k.econLoss==null?'—':Math.round(k.econLoss).toLocaleString()}</div>
+      <div class="k-n">空胎延長 計${k.lossDays}日 × ${S.farm.lossPerDay}円/日（単価は農場設定で変更可）</div>
+    </div>
+    ${k.bcsArr.length?`<div class="section-h">BCS分布（在群 ${k.bcsArr.length}頭）</div><div class="chart-wrap"><canvas id="bcs-canvas"></canvas></div>`:''}
+    <div class="warnbox" style="margin-top:16px">⚠️ 各KPIの定義は近似を含みます（例：次分娩がある泌乳を受胎とみなす、発情発見率は実授精数を実発情数の代用とする 等）。運用前に定義をご確認・調整ください。旧Excelの「結果」シートは日付シリアル値の混入で異常値が出ていたため、本アプリは定義から計算し直しています。</div>`;
+  if(k.bcsArr.length) requestAnimationFrame(()=>drawBCS($('#bcs-canvas'),k.bcsArr));
+}
+function drawBCS(canvas,arr){
+  if(!canvas) return;
+  const bins={}; const keys=[];
+  for(let v=2.0; v<=4.5+1e-6; v+=0.25){ const key=v.toFixed(2); bins[key]=0; keys.push(key); }
+  arr.forEach(v=>{ let nearest=keys[0],best=9; keys.forEach(k=>{ const d=Math.abs(parseFloat(k)-v); if(d<best){best=d;nearest=k;} }); bins[nearest]++; });
+  const dpr=window.devicePixelRatio||1, cssW=canvas.parentElement.clientWidth-28, cssH=200;
+  canvas.width=cssW*dpr;canvas.height=cssH*dpr;canvas.style.width=cssW+'px';canvas.style.height=cssH+'px';
+  const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,cssW,cssH);ctx.fillStyle='#fff';ctx.fillRect(0,0,cssW,cssH);
+  const padL=26,padB=26,padT=10,padR=8, w=cssW-padL-padR,h=cssH-padT-padB;
+  const max=Math.max(1,...keys.map(k=>bins[k]));
+  const bw=w/keys.length;
+  ctx.fillStyle='#8a988f';ctx.font='9px sans-serif';ctx.textAlign='center';
+  keys.forEach((k,i)=>{
+    const bh=bins[k]/max*h, bx=padL+i*bw+2, by=padT+h-bh;
+    ctx.fillStyle=bins[k]?'#276749':'#e3e6df'; ctx.fillRect(bx,by,bw-4,bh);
+    if(bins[k]){ ctx.fillStyle='#1b241f'; ctx.fillText(bins[k], bx+(bw-4)/2, by-3); }
+    if(i%2===0){ ctx.fillStyle='#8a988f'; ctx.fillText(parseFloat(k).toFixed(2), padL+i*bw+bw/2, cssH-8); }
+  });
+}
+
+/* ---------- データ出力／バックアップ ---------- */
+let ioSel={cows:true,events:true,jmr:false,kpi:false,lists:false};
+function renderDataIO(){
+  app.innerHTML=`
+    <div class="section-h">CSV出力（PCの表計算ソフト用・UTF-8 BOM付）</div>
+    <div class="card pad">
+      ${chk('cows','牛マスタ','識別名・番号・生年月日・状態など')}
+      ${chk('events','イベント','分娩／授精／妊鑑／検診所見／乾乳')}
+      ${chk('jmr','JMR月別系列','月・群JMR・経産/未経産内訳・頭数')}
+      ${chk('kpi','KPI集計','2.3の各指標')}
+      ${chk('lists','未授精／妊鑑リスト','現時点のスナップショット')}
+    </div>
+    <div class="card pad" style="margin-top:12px">
+      <div class="row2">
+        <div class="field" style="margin-bottom:0"><label>期間 開始（イベント/KPI）</label><input type="date" id="io-from" value="${addDays(S.base,-365)}"></div>
+        <div class="field" style="margin-bottom:0"><label>期間 終了</label><input type="date" id="io-to" value="${S.base}"></div>
+      </div>
+    </div>
+    <button class="btn" style="margin-top:14px" data-act="exportcsv">📄 選択項目をCSVで書き出す</button>
+
+    <div class="section-h">画像・印刷</div>
+    <div class="stack">
+      <button class="btn sec" data-act="exportjmrpng2">🖼 JMR月別推移グラフをPNGで書き出す</button>
+      <button class="btn sec" data-act="printview">🖨 印刷ビュー（PCでPDF保存）</button>
+    </div>
+
+    <div class="section-h">全データ バックアップ（JSON）</div>
+    <div class="card pad">
+      <div class="info" style="margin-bottom:12px">全農場・全牛・全イベントを1ファイルに書き出します。端末の入替えやデータ消失に備え、<b>定期的に保存</b>してください。</div>
+      <div class="stack">
+        <button class="btn" data-act="exportjson">💾 バックアップを書き出す</button>
+        <button class="btn ghost" data-act="importjson">📂 バックアップを読み込む（全置換）</button>
+        <input type="file" id="import-file" accept="application/json" style="display:none">
+      </div>
+    </div>
+    <div style="height:8px"></div>`;
+}
+function chk(k,t,s){ return `<label class="check"><input type="checkbox" data-io="${k}" ${ioSel[k]?'checked':''}><div><div class="c-t">${t}</div><div class="c-s">${s}</div></div></label>`; }
+
+/* =====================================================================
+   CSV / JSON / PNG 出力
+   ===================================================================== */
+function csvCell(v){ if(v==null) v=''; v=String(v); return /[",\n]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; }
+function toCSV(rows){ return rows.map(r=>r.map(csvCell).join(',')).join('\r\n'); }
+function download(filename, content, mime){
+  const blob = content instanceof Blob? content : new Blob(['\ufeff'+content],{type:mime||'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); },500);
+}
+function stamp(){ return todayStr().replace(/-/g,''); }
+
+function exportCSV(){
+  const from=$('#io-from')?.value, to=$('#io-to')?.value;
+  const parts=[];
+  const farmName=S.farm.name;
+  if(ioSel.cows){
+    const rows=[['識別名','識別番号','牛番号','共済番号','生年月日','状態','産次','妊否','個体JMR','最終分娩','最終授精','備考']];
+    S.cows.forEach(c=>{ const st=stateOf(c),j=jmrOf(c); rows.push([c.name,c.tagNo,c.cowNo,c.kyosaiNo,c.birthDate,c.status,st.parity,st.preg,(j==null?'':j),st.lastCalving||'',st.lastAI||'',c.note]); });
+    parts.push(['牛マスタ',rows]);
+  }
+  if(ioSel.events){
+    const rows=[['識別名','識別番号','日付','種別','種雄牛','方式','精液','結果','左卵巣','右卵巣','子宮','BCS','処置','指示','備考']];
+    const cowMap=Object.fromEntries(S.cows.map(c=>[c.id,c]));
+    S.events.filter(e=>(!from||e.date>=from)&&(!to||e.date<=to)).sort((a,b)=>a.date<b.date?-1:1)
+      .forEach(e=>{ const c=cowMap[e.cowId]||{}; rows.push([c.name,c.tagNo,e.date,EVENT_LABEL[e.type],e.sire,e.method,e.semenType,e.result,e.leftOvary,e.rightOvary,e.uterus,e.bcs,e.treatment,e.instruction,e.note]); });
+    parts.push(['イベント',rows]);
+  }
+  if(ioSel.jmr){
+    const s=jmrMonthly(24,'both'); const rows=[['月','群JMR','経産JMR','未経産JMR','対象頭数','経産頭数','未経産頭数']];
+    s.forEach(p=>rows.push([p.label,p.value==null?'':p.value.toFixed(1),p.multi==null?'':p.multi.toFixed(1),p.heifer==null?'':p.heifer.toFixed(1),p.n,p.mN,p.hN]));
+    parts.push(['JMR月別系列',rows]);
+  }
+  if(ioSel.kpi){
+    const k=kpi(from,to);
+    const rows=[['指標','値','単位'],
+      ['初回授精日数',fmtN(k.d2first),'日'],['実空胎日数',fmtN(k.open),'日'],['分娩間隔',fmtN(k.ci),'日'],['期待分娩間隔',fmtN(k.expectedCI),'日'],
+      ['授精回数/受胎',fmtN(k.services,1),'回'],['受胎率',fmtN(k.conceptionRate==null?null:k.conceptionRate*100,1),'%'],['初回受胎率',fmtN(k.firstConcRate==null?null:k.firstConcRate*100,1),'%'],
+      ['発情発見率',fmtN(k.heatDetect==null?null:k.heatDetect*100,1),'%'],['妊娠率',fmtN(k.pregRate==null?null:k.pregRate*100,1),'%'],
+      ['平均産次',fmtN(k.avgParity,1),'産'],['平均BCS',fmtN(k.avgBCS,1),''],['頭数',k.headcount,'頭'],['経済損失',Math.round(k.econLoss||0),'円']];
+    parts.push(['KPI集計',rows]);
+  }
+  if(ioSel.lists){
+    const oa=openAiList(), pc=pregCheckList();
+    const r1=[['未授精リスト'],['識別名','識別番号','分娩後日数','産次','最終分娩','最終授精']];
+    oa.forEach(({c,st})=>r1.push([c.name,c.tagNo,st.daysSinceCalving,st.parity,st.lastCalving||'',st.lastAI||'']));
+    const r2=[['妊鑑リスト'],['識別名','識別番号','種付け後日数','産次','最終授精','最終鑑定']];
+    pc.forEach(({c,st})=>r2.push([c.name,c.tagNo,st.daysSinceAI,st.parity,st.lastAI||'',st.lastPC?st.lastPC.date:'']));
+    parts.push(['リスト',[...r1,[''],...r2]]);
+  }
+  if(!parts.length){ toast('出力する項目を選んでください'); return; }
+  // まとめて1ファイル（セクション見出しで区切る）
+  const all=[];
+  parts.forEach(([title,rows],i)=>{ if(i) all.push([''],['']); all.push(['■ '+title]); rows.forEach(r=>all.push(r)); });
+  download(`繁殖_${farmName}_${stamp()}.csv`, toCSV(all));
+  toast('CSVを書き出しました');
+}
+function fmtN(v,dp=0){ return v==null||isNaN(v)?'':Number(v).toFixed(dp); }
+
+async function exportJSON(){
+  const farms=await DB.getAll('farms'), cows=await DB.getAll('cows'), events=await DB.getAll('events');
+  const data={app:'hanshoku-junkai',version:1,exportedAt:new Date().toISOString(),farms,cows,events};
+  download(`繁殖_バックアップ_${stamp()}.json`, JSON.stringify(data,null,1), 'application/json');
+  toast(`バックアップを書き出しました（牛${cows.length}・イベント${events.length}）`);
+}
+function importJSON(file){
+  const r=new FileReader();
+  r.onload=async()=>{
+    try{
+      const d=JSON.parse(r.result);
+      if(!d.farms||!d.cows||!d.events) throw new Error('形式が違います');
+      if(!confirm(`現在の全データを、この内容で置き換えます。\n農場${d.farms.length}・牛${d.cows.length}・イベント${d.events.length}\nよろしいですか？（元に戻せません）`)) return;
+      await DB.clear('farms'); await DB.clear('cows'); await DB.clear('events');
+      await DB.putMany('farms',d.farms); await DB.putMany('cows',d.cows); await DB.putMany('events',d.events);
+      S.farms=await DB.getAll('farms');
+      await loadFarm((S.farm&&S.farms.find(f=>f.id===S.farm.id))?S.farm.id:(S.farms[0]?.id||null));
+      go('home'); toast('読み込みが完了しました');
+    }catch(e){ alert('読み込みに失敗しました：'+e.message); }
+  };
+  r.readAsText(file);
+}
+
+function exportJMRPNG(){
+  const cv=document.createElement('canvas');
+  drawLine(cv, jmrMonthly(jmrOpt.months||12, jmrOpt.pop||'both'), true);
+  cv.toBlob(b=>{ download(`JMR推移_${S.farm.name}_${stamp()}.png`, b); toast('PNG画像を書き出しました'); },'image/png');
+}
+
+function printView(){
+  const k=kpi(addDays(S.base,-365),S.base), h=herdJMR();
+  const oa=openAiList(), pc=pregCheckList();
+  const pa=$('#print-area');
+  pa.innerHTML=`
+    <div style="padding:20px;font-size:13px">
+      <h2 style="margin:0 0 4px">繁殖巡回レポート — ${esc(S.farm.name)}</h2>
+      <div style="color:#666">検診日 ${fmtJ(S.base)} ／ 出力 ${fmtJ(todayStr())}</div>
+      <h3>群サマリー</h3>
+      <p>在群 ${k.headcount}頭 ／ 群JMR ${h.avg==null?'—':num(h.avg,1)}（経産 ${num(h.multi.avg,1)} ・ 未経産 ${num(h.heifer.avg,1)}）／ 平均産次 ${num(k.avgParity,1)} ／ 平均BCS ${num(k.avgBCS,1)}</p>
+      <h3>KPI（直近1年・分娩日基準）</h3>
+      <table style="width:100%;border-collapse:collapse" border="1" cellpadding="5">
+        <tr><td>初回授精日数</td><td>${num(k.d2first)}日</td><td>実空胎日数</td><td>${num(k.open)}日</td></tr>
+        <tr><td>分娩間隔</td><td>${num(k.ci)}日</td><td>授精回数/受胎</td><td>${num(k.services,1)}回</td></tr>
+        <tr><td>受胎率</td><td>${num(k.conceptionRate==null?null:k.conceptionRate*100,1)}%</td><td>初回受胎率</td><td>${num(k.firstConcRate==null?null:k.firstConcRate*100,1)}%</td></tr>
+        <tr><td>発情発見率</td><td>${num(k.heatDetect==null?null:k.heatDetect*100,1)}%</td><td>妊娠率</td><td>${num(k.pregRate==null?null:k.pregRate*100,1)}%</td></tr>
+      </table>
+      <h3>未授精リスト（${oa.length}頭）</h3>
+      <table style="width:100%;border-collapse:collapse" border="1" cellpadding="4">
+        <tr><th>牛</th><th>分娩後</th><th>産次</th><th>最終分娩</th></tr>
+        ${oa.map(({c,st})=>`<tr><td>${esc(c.name)} ${esc(c.tagNo||'')}</td><td>${st.daysSinceCalving}日</td><td>${st.parity}</td><td>${fmtJ(st.lastCalving)}</td></tr>`).join('')}
+      </table>
+      <h3>妊鑑リスト（${pc.length}頭）</h3>
+      <table style="width:100%;border-collapse:collapse" border="1" cellpadding="4">
+        <tr><th>牛</th><th>種付け後</th><th>最終授精</th></tr>
+        ${pc.map(({c,st})=>`<tr><td>${esc(c.name)} ${esc(c.tagNo||'')}</td><td>${st.daysSinceAI}日</td><td>${fmtJ(st.lastAI)}</td></tr>`).join('')}
+      </table>
+    </div>`;
+  window.print();
+}
+
+/* =====================================================================
+   ボトムシート（検診日・農場切替）
+   ===================================================================== */
+function openSheet(html){ $('#sheet').innerHTML=html; $('#sheet-bg').classList.add('show'); }
+function closeSheet(){ $('#sheet-bg').classList.remove('show'); }
+$('#sheet-bg').addEventListener('click',e=>{ if(e.target.id==='sheet-bg') closeSheet(); });
+
+function sheetBaseDate(){
+  openSheet(`
+    <h3>検診日（基準日）</h3>
+    <div class="info" style="margin-bottom:12px">各種の日数・JMR・リストは、この日付を基準に計算します。</div>
+    <input type="date" id="sheet-date" value="${S.base}">
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn sec" data-act="settoday">今日にする</button>
+      <button class="btn" data-act="applydate">適用</button>
+    </div>`);
+}
+function sheetFarms(){
+  openSheet(`
+    <h3>農場の切り替え・追加</h3>
+    <div class="stack">
+      ${S.farms.map(f=>`<button class="cow-row" data-act="switchfarm" data-id="${f.id}"><div class="id"><div class="nm">${esc(f.name)}</div></div><div class="rt">${f.id===S.farm?.id?'✓':'切替'}</div></button>`).join('')}
+    </div>
+    <div class="divider"></div>
+    <button class="btn" data-act="newfarm">＋ 新しい農場を追加</button>
+    <button class="btn sec wide" style="margin-top:10px" data-act="gomanage">農場管理・設定を開く</button>`);
+}
+
+/* =====================================================================
+   保存アクション
+   ===================================================================== */
+async function saveFarm(){
+  const name=$('#f_name').value.trim();
+  if(!name){ toast('農場名を入力してください'); return; }
+  const editing = S.param.id? S.farms.find(f=>f.id===S.param.id) : null;
+  const f = editing? {...editing} : {id:uid(), ...DEFAULT_FARM()};
+  f.name=name;
+  ['vwpFirst','vwpMulti','heiferBreedingAge','gestationDays','cycleDays','lossPerDay','openAiThreshold','pregCheckThreshold']
+    .forEach(k=>{ const v=parseFloat($('#f_'+k).value); if(!isNaN(v)) f[k]=v; });
+  await DB.put('farms',f);
+  S.farms=await DB.getAll('farms');
+  await loadFarm(f.id);
+  toast(editing?'保存しました':'農場を作成しました');
+  go('home');
+}
+async function delFarm(id){
+  const cows=await DB.byIndex('cows','farmId',id);
+  if(!confirm(`この農場と、所属する牛${cows.length}頭・その全イベントを削除します。よろしいですか？`)) return;
+  for(const c of cows){ const evs=await DB.byIndex('events','cowId',c.id); for(const e of evs) await DB.del('events',e.id); await DB.del('cows',c.id); }
+  await DB.del('farms',id);
+  S.farms=await DB.getAll('farms');
+  await loadFarm(S.farms[0]?.id||null);
+  toast('農場を削除しました'); go(S.farm?'home':'home');
+}
+async function saveCow(){
+  const name=$('#c_name').value.trim(), tagNo=$('#c_tagNo').value.trim();
+  if(!name && !tagNo){ toast('識別名か識別番号を入力してください'); return; }
+  const editing=S.param.id? S.cows.find(c=>c.id===S.param.id):null;
+  const c=editing?{...editing}:{id:uid(),farmId:S.farm.id};
+  c.name=name; c.tagNo=tagNo; c.cowNo=$('#c_cowNo').value.trim(); c.kyosaiNo=$('#c_kyosaiNo').value.trim();
+  c.birthDate=$('#c_birthDate').value; c.status=$('#c_status').value; c.note=$('#c_note').value.trim();
+  await DB.put('cows',c); await loadFarm(S.farm.id);
+  toast(editing?'保存しました':'牛を登録しました');
+  if(editing) push('cow',{id:c.id}); else push('cow',{id:c.id});
+}
+async function delCow(id){
+  if(!confirm('この牛と全イベント履歴を削除します。よろしいですか？')) return;
+  const evs=await DB.byIndex('events','cowId',id); for(const e of evs) await DB.del('events',e.id);
+  await DB.del('cows',id); await loadFarm(S.farm.id);
+  toast('削除しました'); go('cows');
+}
+async function saveEvent(cowId){
+  const e={id:uid(),cowId,farmId:S.farm.id,type:evForm.type,date:$('#e_date').value,note:($('#e_note')?.value||'').trim()};
+  if(!e.date){ toast('日付を入力してください'); return; }
+  if(e.type==='AI'){ e.sire=($('#e_sire')?.value||'').trim(); e.method=$('#e_method')?.value||'AI'; e.semenType=$('#e_semenType')?.value||''; }
+  if(e.type==='preg_check'){ e.result=$('#e_result')?.value||'妊娠'; }
+  if(e.type==='exam'){ e.leftOvary=($('#e_leftOvary')?.value||'').trim(); e.rightOvary=($('#e_rightOvary')?.value||'').trim(); e.uterus=($('#e_uterus')?.value||'').trim(); const b=$('#e_bcs')?.value; e.bcs=b===''?null:(b==null?null:parseFloat(b)); e.treatment=($('#e_treatment')?.value||'').trim(); e.instruction=($('#e_instruction')?.value||'').trim(); }
+  await DB.put('events',e); await loadFarm(S.farm.id);
+  toast(`${EVENT_LABEL[e.type]}を記録しました`); goBack();
+}
+async function delEvent(id){
+  if(!confirm('このイベントを削除しますか？')) return;
+  await DB.del('events',id); await loadFarm(S.farm.id); render(); toast('削除しました');
+}
+/* リスト内クイック記録 */
+async function saveFind(cowId){
+  const g=id=>($('#'+id+'_'+cowId)?.value||'').trim();
+  const e={id:uid(),cowId,farmId:S.farm.id,type:'exam',date:S.base,leftOvary:g('lf_left'),rightOvary:g('lf_right'),uterus:g('lf_uterus'),treatment:g('lf_treat'),instruction:g('lf_instr'),bcs:null,note:''};
+  if(!e.leftOvary&&!e.rightOvary&&!e.uterus&&!e.treatment&&!e.instruction){ toast('所見を入力してください'); return; }
+  await DB.put('events',e); await loadFarm(S.farm.id); openFind.delete(cowId); render(); toast('検診所見を記録しました');
+}
+async function quickAI(cowId){
+  const e={id:uid(),cowId,farmId:S.farm.id,type:'AI',date:S.base,method:'AI',sire:'',semenType:'',note:'リストから記録'};
+  await DB.put('events',e); await loadFarm(S.farm.id); openFind.delete(cowId); render(); toast('授精を記録しました');
+}
+async function quickPC(cowId){
+  const res=prompt('妊娠鑑定の結果を入力（妊娠 / 不妊 / 再検）','妊娠'); if(!res) return;
+  if(!PREG_RESULTS.includes(res)){ toast('妊娠 / 不妊 / 再検 のいずれかを入力'); return; }
+  const e={id:uid(),cowId,farmId:S.farm.id,type:'preg_check',date:S.base,result:res,note:'リストから記録'};
+  await DB.put('events',e); await loadFarm(S.farm.id); openFind.delete(cowId); render(); toast('妊鑑を記録しました');
+}
+
+/* =====================================================================
+   イベント委任
+   ===================================================================== */
+document.addEventListener('click', async (ev)=>{
+  const nb=ev.target.closest('[data-nav]');
+  if(nb){ const v=nb.dataset.nav; const tab=nb.dataset.tab;
+    if(v==='lists'){ listTab=tab||'openai'; go(tab==='pregcheck'?'pregcheck':'openai',{tab:listTab}); return; }
+    if(v==='metrics'){ go('jmr'); return; }
+    if(v==='home'&&nb.dataset.act==='managefarms'){ go('farms'); return; }
+    if(['home','cows','dataio'].includes(v)){ go(v); return; }
+    go(v); return;
+  }
+  const el=ev.target.closest('[data-act]'); if(!el) return;
+  const act=el.dataset.act, id=el.dataset.id;
+  switch(act){
+    case 'back': goBack(); break;
+    case 'basedate': sheetBaseDate(); break;
+    case 'settoday': S.base=todayStr(); closeSheet(); render(); break;
+    case 'applydate': { const d=$('#sheet-date').value; if(d){ S.base=d; } closeSheet(); render(); } break;
+    case 'opentab': go(el.dataset.tab==='pregcheck'?'pregcheck':'openai',{tab:el.dataset.tab}); break;
+    case 'managefarms': go('farms'); break;
+    case 'gomanage': closeSheet(); go('farms'); break;
+    case 'farmsettings': push('farmEdit',{id:S.farm.id}); break;
+    case 'farmsettings2': push('farmEdit',{id:S.farm.id}); break;
+    case 'newfarm': closeSheet(); push('farmEdit',{}); break;
+    case 'editfarm': push('farmEdit',{id}); break;
+    case 'savefarm': saveFarm(); break;
+    case 'delfarm': delFarm(id); break;
+    case 'switchfarm': await loadFarm(id); closeSheet(); go('home'); break;
+    case 'quickadd': push('cowEdit',{}); break;
+    case 'opencow': push('cow',{id}); break;
+    case 'editcow': push('cowEdit',{id}); break;
+    case 'savecow': saveCow(); break;
+    case 'delcow': delCow(id); break;
+    case 'addevent': evForm={type:'exam'}; push('event',{cowId:id}); break;
+    case 'saveevent': saveEvent(id); break;
+    case 'delevent': delEvent(id); break;
+    case 'togglefind': if(openFind.has(id)) openFind.delete(id); else openFind.add(id); render(); break;
+    case 'savefind': saveFind(id); break;
+    case 'quickai': quickAI(id); break;
+    case 'quickpc': quickPC(id); break;
+    case 'exportjmrpng': case 'exportjmrpng2': exportJMRPNG(); break;
+    case 'exportcsv': exportCSV(); break;
+    case 'exportjson': exportJSON(); break;
+    case 'importjson': $('#import-file').click(); break;
+    case 'printview': printView(); break;
+  }
+});
+
+/* 変更系（チップ・セグメント・入力） */
+document.addEventListener('click',(ev)=>{
+  const t=ev.target;
+  // イベント種別チップ
+  const et=t.closest('[data-etype]'); if(et){ evForm.type=et.dataset.etype; render(); return; }
+  // 妊鑑結果
+  const pc=t.closest('[data-pc]'); if(pc){ $('#pc-chips').querySelectorAll('.chip').forEach(x=>x.classList.remove('on')); pc.classList.add('on'); $('#e_result').value=pc.dataset.pc; return; }
+  // AI方式セグメント
+  const sg=t.closest('.seg-pick'); if(sg){ sg.parentElement.querySelectorAll('.seg-pick').forEach(x=>x.classList.remove('on')); sg.classList.add('on'); const inp=$('#e_'+sg.dataset.seg); if(inp) inp.value=sg.dataset.v; return; }
+  // 牛一覧フィルタ
+  const fs=t.closest('[data-fstatus]'); if(fs){ cowFilter.status=fs.dataset.fstatus; render(); return; }
+  // リストタブ
+  const lt=t.closest('[data-listtab]'); if(lt){ go(lt.dataset.listtab==='pregcheck'?'pregcheck':'openai',{tab:lt.dataset.listtab}); return; }
+  // 指標タブ
+  const mt=t.closest('[data-metrictab]'); if(mt){ go(mt.dataset.metrictab==='kpi'?'kpi':'jmr'); return; }
+  // JMRオプション
+  const jp=t.closest('[data-jpop]'); if(jp){ jmrOpt.pop=jp.dataset.jpop; render(); return; }
+  const jm=t.closest('[data-jmonths]'); if(jm){ jmrOpt.months=+jm.dataset.jmonths; render(); return; }
+});
+
+document.addEventListener('input',(ev)=>{
+  const t=ev.target;
+  if(t.id==='cow-q'){ cowFilter.q=t.value; const cur=t.selectionStart;
+    // 再描画すると入力欄が作り直されるため、軽量に絞り込みだけ更新
+    debouncedCows(); return; }
+  if(t.dataset && t.dataset.io!=null){ ioSel[t.dataset.io]=t.checked; return; }
+});
+document.addEventListener('change',(ev)=>{
+  const t=ev.target;
+  if(t.id==='farm-sel'){ loadFarm(t.value).then(()=>go('home')); return; }
+  if(t.id==='import-file' && t.files[0]){ importJSON(t.files[0]); t.value=''; return; }
+  if(t.id==='kpi-from'){ kpiRange.from=t.value; render(); return; }
+  if(t.id==='kpi-to'){ kpiRange.to=t.value; render(); return; }
+});
+let cowsTimer=null;
+function debouncedCows(){ clearTimeout(cowsTimer); cowsTimer=setTimeout(()=>{ if(S.view==='cows'){ const q=$('#cow-q'); const focus=document.activeElement===q; const pos=q?q.selectionStart:0; renderCows(); if(focus){ const nq=$('#cow-q'); if(nq){ nq.focus(); try{nq.setSelectionRange(pos,pos);}catch(e){} } } } },160); }
+
+/* =====================================================================
+   初期化・PWA登録
+   ===================================================================== */
+window.addEventListener('online',()=>{ S.online=true; renderHeader(); });
+window.addEventListener('offline',()=>{ S.online=false; renderHeader(); });
+
+async function init(){
+  try{
+    await DB.open();
+    S.farms=await DB.getAll('farms');
+    const last=await DB.metaGet('lastFarm');
+    const fid = (last && S.farms.find(f=>f.id===last))? last : (S.farms[0]?.id||null);
+    if(fid) await loadFarm(fid);
+    go('home');
+  }catch(e){
+    app.innerHTML=`<div class="empty"><div class="e-ic">⚠️</div><div class="e-t">データベースを開けませんでした</div><div class="info" style="margin-top:8px">プライベートブラウズや設定でストレージが制限されている可能性があります。${esc(e.message||'')}</div></div>`;
+  }
+  if('serviceWorker' in navigator){
+    try{ await navigator.serviceWorker.register('sw.js'); }catch(e){ /* オフラインキャッシュ不可でも動作は継続 */ }
+  }
+}
+init();
+</script>
+</body>
+</html>

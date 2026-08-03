@@ -1,0 +1,17 @@
+{
+  "name": "繁殖巡回 記録・閲覧",
+  "short_name": "繁殖巡回",
+  "description": "酪農場の繁殖検診をスマホ単体で記録・閲覧するオフライン対応アプリ。データは端末内にのみ保存されます。",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f3ef",
+  "theme_color": "#276749",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
