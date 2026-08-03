@@ -122,6 +122,7 @@ textarea{min-height:74px;resize:vertical;line-height:1.45}
 .seg{display:flex;background:var(--line2);border-radius:12px;padding:3px;gap:3px}
 .seg button{flex:1;padding:9px 6px;border-radius:9px;font-size:13px;font-weight:700;color:var(--muted)}
 .seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.seg-repro button{font-size:11.5px;padding:9px 2px;white-space:nowrap;min-width:0}
 
 /* ---- JMR pill ---- */
 .pill{display:inline-flex;align-items:center;justify-content:center;min-width:46px;padding:4px 9px;border-radius:9px;font-weight:800;font-size:14px}
@@ -697,20 +698,29 @@ function renderFarmEdit(){
 }
 
 /* ---------- 牛一覧 ---------- */
-let cowFilter={q:'',status:'在群'};
+const REPRO_GROUPS=[['minus','妊（－）'],['wait','妊鑑待ち'],['plus','妊（＋）'],['excluded','繁殖除外'],['all','全て']];
+/* 牛一覧の群分け：繁殖状態ベース */
+function repGroup(cow){
+  if(cow.status && cow.status!=='在群') return 'excluded';    // 乾乳・出荷・淘汰＝繁殖除外
+  const st=stateOf(cow);
+  if(st.isPreg) return 'plus';                                 // 妊娠確認済＝妊（＋）
+  const bredThisCycle = st.lastAI && (!st.lastCalving || st.lastAI > st.lastCalving); // 最終分娩より後の授精のみ有効
+  if(bredThisCycle && (st.preg==='未確定'||st.preg==='再検')) return 'wait';           // 授精済・鑑定待ち
+  return 'minus';                                              // 未授精・不妊など＝妊（－）
+}
+let cowFilter={q:'',group:'all'};
 function renderCows(){
   if(!S.farm) return renderNoFarm();
   const q=cowFilter.q.trim().toLowerCase();
   let list=S.cows.filter(c=>{
-    if(cowFilter.status!=='all' && c.status!==cowFilter.status) return false;
+    if(cowFilter.group!=='all' && repGroup(c)!==cowFilter.group) return false;
     if(q){ const hay=`${c.name||''} ${c.tagNo||''} ${c.cowNo||''} ${c.kyosaiNo||''}`.toLowerCase(); if(!hay.includes(q)) return false; }
     return true;
   });
   list.sort((a,b)=> (a.name||'').localeCompare(b.name||'','ja'));
-  const statuses=['在群','乾乳','出荷','淘汰','all'];
   app.innerHTML = `
     <div class="searchbar"><span class="si">🔍</span><input type="search" id="cow-q" placeholder="名前・番号で検索" value="${esc(cowFilter.q)}"></div>
-    <div class="seg" style="margin-bottom:12px">${statuses.map(s=>`<button data-fstatus="${s}" class="${cowFilter.status===s?'on':''}">${s==='all'?'全て':s}</button>`).join('')}</div>
+    <div class="seg seg-repro" style="margin-bottom:12px">${REPRO_GROUPS.map(([k,lbl])=>`<button data-fgroup="${k}" class="${cowFilter.group===k?'on':''}">${lbl}</button>`).join('')}</div>
     <div class="count-note">${list.length}頭</div>
     <div class="stack">
     ${list.map(c=>{ const st=stateOf(c); const j=jmrOf(c); return `
@@ -1550,7 +1560,7 @@ document.addEventListener('click',(ev)=>{
   // AI方式セグメント
   const sg=t.closest('.seg-pick'); if(sg){ sg.parentElement.querySelectorAll('.seg-pick').forEach(x=>x.classList.remove('on')); sg.classList.add('on'); const inp=$('#e_'+sg.dataset.seg); if(inp) inp.value=sg.dataset.v; return; }
   // 牛一覧フィルタ
-  const fs=t.closest('[data-fstatus]'); if(fs){ cowFilter.status=fs.dataset.fstatus; render(); return; }
+  const fs=t.closest('[data-fgroup]'); if(fs){ cowFilter.group=fs.dataset.fgroup; render(); return; }
   // リストタブ
   const lt=t.closest('[data-listtab]'); if(lt){ go(lt.dataset.listtab==='pregcheck'?'pregcheck':'openai',{tab:lt.dataset.listtab}); return; }
   // 指標タブ
