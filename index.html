@@ -568,7 +568,7 @@ function renderHeader(){
   const pushed = !!S.back;
   const title = ({home:'ホーム',farms:'農場管理',cows:'牛一覧',cow:'個体カルテ',event:'イベント入力',
     openai:'未授精リスト',pregcheck:'妊鑑リスト',lists:'検診リスト',jmr:'JMR月別推移',kpi:'KPIダッシュボード',
-    dataio:'データ出力／バックアップ',farmEdit:'農場設定',cowEdit:'牛の登録・編集'})[S.view]||'繁殖巡回';
+    dataio:'データ取り込み・出力',farmEdit:'農場設定',cowEdit:'牛の登録・編集'})[S.view]||'繁殖巡回';
   const todayOff = S.base!==todayStr();
   hdr.innerHTML = `
    <div class="hdr-row">
@@ -637,7 +637,7 @@ function renderHome(){
       <button class="qbtn" data-nav="cows"><span class="ic">🐄</span>牛を探して記録</button>
       <button class="qbtn" data-act="quickadd"><span class="ic">➕</span>新しい牛を登録</button>
       <button class="qbtn" data-nav="metrics"><span class="ic">📈</span>JMR・KPI</button>
-      <button class="qbtn" data-nav="dataio"><span class="ic">💾</span>出力・バックアップ</button>
+      <button class="qbtn" data-nav="dataio"><span class="ic">💾</span>取り込み・出力</button>
     </div>
 
     <div class="section-h">農場</div>
@@ -1054,7 +1054,7 @@ function renderDataIO(){
     </div>
     <button class="btn" style="margin-top:14px" data-act="exportcsv">📄 選択項目をCSVで書き出す</button>
 
-    <div class="section-h">CSV一括取り込み（農場ごと・上書き）</div>
+    <div class="section-h">データ取り込み①：CSV（農場ごとに上書き）</div>
     <div class="card pad">
       <div class="info" style="margin-bottom:10px">選んだ農場に対して <b>牛とイベントを丸ごと入れ替え</b>ます（他の農場には影響しません）。文字コードは <b>UTF-8・Shift_JIS どちらでもOK</b>。日付は <code>2026-02-01</code> / <code>2026/2/1</code> / Excelの数値、いずれも読み取ります。</div>
       <div style="font-weight:800;font-size:13px;margin:4px 0 6px">① ひな形を書き出してExcelで記入</div>
@@ -1072,20 +1072,23 @@ function renderDataIO(){
       <button class="btn" style="margin-top:12px" data-act="importcsv">📥 この内容で取り込む（上書き）</button>
     </div>
 
+    <div class="section-h">データ取り込み②：JSON（全データを置き換え）</div>
+    <div class="card pad">
+      <div class="info" style="margin-bottom:10px">以前このアプリで書き出したJSON、または配布された取り込み用JSONを読み込みます。<b>全農場・全データを置き換えます。</b></div>
+      <button class="btn ghost" data-act="importjson">📂 JSONファイルを取り込む（全置換）</button>
+      <input type="file" id="import-file" accept="application/json,.json" style="display:none">
+    </div>
+
     <div class="section-h">画像・印刷</div>
     <div class="stack">
       <button class="btn sec" data-act="exportjmrpng2">🖼 JMR月別推移グラフをPNGで書き出す</button>
       <button class="btn sec" data-act="printview">🖨 印刷ビュー（PCでPDF保存）</button>
     </div>
 
-    <div class="section-h">全データ バックアップ（JSON）</div>
+    <div class="section-h">バックアップの書き出し（JSON）</div>
     <div class="card pad">
-      <div class="info" style="margin-bottom:12px">全農場・全牛・全イベントを1ファイルに書き出します。端末の入替えやデータ消失に備え、<b>定期的に保存</b>してください。</div>
-      <div class="stack">
-        <button class="btn" data-act="exportjson">💾 バックアップを書き出す</button>
-        <button class="btn ghost" data-act="importjson">📂 バックアップを読み込む（全置換）</button>
-        <input type="file" id="import-file" accept="application/json" style="display:none">
-      </div>
+      <div class="info" style="margin-bottom:12px">全農場・全牛・全イベントを1ファイルに書き出します。端末の入替えやデータ消失に備え、<b>定期的に保存</b>してください。書き出したJSONは上の「データ取り込み②」で読み込めます。</div>
+      <button class="btn" data-act="exportjson">💾 バックアップを書き出す</button>
     </div>
     <div style="height:8px"></div>`;
 }
