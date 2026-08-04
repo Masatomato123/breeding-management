@@ -321,7 +321,7 @@ const DEFAULT_FARM = ()=>({
   cycleDays:21, openAiThreshold:40, pregCheckThreshold:28, lossPerDay:300
 });
 const EVENT_LABEL = {calving:'分娩', AI:'授精', preg_check:'妊娠鑑定', exam:'検診所見', dry_off:'乾乳'};
-const STATUS_LIST = ['在群','乾乳','出荷','淘汰'];
+const STATUS_LIST = ['在群','繁殖除外'];
 const PREG_RESULTS = ['妊娠','不妊','再検'];
 const OVARY_SUGGEST = ['黄体','卵胞','静止','嚢腫','排卵前','小卵胞'];
 const UTERUS_SUGGEST = ['正常','貯留','子宮内膜炎','弛緩','充実'];
@@ -343,8 +343,8 @@ const eventsByCow = id => S.events.filter(e=>e.cowId===id)
 const csvFiles = {farm:null, cows:null, events:null};   // 選択中のCSVファイル
 const CSV_TMPL = {
   farm:  ['農場名','初産VWP','経産VWP','未経産授精開始日齢','妊娠期間','発情周期','未授精閾値','妊鑑閾値','損失単価'],
-  cows:  ['個体識別番号','牛名','牛番号','共済番号','生年月日','状態','備考'],
-  events:['個体識別番号','日付','種別','種雄','授精方法','精液種別','妊娠鑑定結果','左卵巣','右卵巣','子宮','BCS','処置','指示','備考']
+  cows:  ['名号','4桁','個体識別番号','産次数','生年月日','状態','備考'],
+  events:['4桁','日付','種別','種雄','授精方法','精液種別','妊娠鑑定結果','左卵巣','右卵巣','子宮','BCS','処置','指示','備考']
 };
 const TYPE_MAP = {
   '分娩':'calving','出産':'calving','calving':'calving',
@@ -375,7 +375,7 @@ function stateOf(cow, base=S.base, upTo=null){
   const ais      = evs.filter(e=>e.type==='AI');
   const pcs      = evs.filter(e=>e.type==='preg_check');
   const exams    = evs.filter(e=>e.type==='exam');
-  const parity = calvings.length;
+  const parity = Math.max(calvings.length, Number(cow.parity)||0);  // 分娩イベント数と手入力産次数の大きい方
   const lastCalving = calvings.length? calvings[calvings.length-1].date : null;
   const lastAI = ais.length? ais[ais.length-1].date : null;
   const lastPC = pcs.length? pcs[pcs.length-1] : null;
@@ -401,7 +401,7 @@ function stateOf(cow, base=S.base, upTo=null){
 /* 個体JMR（乾乳・出荷・淘汰は対象外→null）。値が小さいほど良い */
 function jmrOf(cow, base=S.base, upTo=null){
   const F=S.farm;
-  if(!upTo && (cow.status==='乾乳'||cow.status==='出荷'||cow.status==='淘汰')) return null;
+  if(!upTo && cow.status!=='在群') return null;   // 繁殖除外は JMR 対象外
   const st = stateOf(cow, base, upTo);
   if(upTo && st.dried) return null;      // 履歴計算時の乾乳除外
   if(st.isPreg) return 0;                // 妊娠確認済 → 0
@@ -583,7 +583,7 @@ function renderHeader(){
 
 /* ---- ボトムナビ ---- */
 function renderNav(){
-  const items=[['home','🏠','ホーム'],['cows','🐄','牛一覧'],['lists','📋','リスト'],['metrics','📈','指標'],['dataio','💾','データ']];
+  const items=[['home','🏠','ホーム'],['cows','🐄','牛一覧'],['lists','📋','検診リスト'],['metrics','📈','指標'],['dataio','💾','データ']];
   const cur = ({openai:'lists',pregcheck:'lists',jmr:'metrics',kpi:'metrics',cow:'cows',cowEdit:'cows',event:'cows',farms:'home',farmEdit:'home'})[S.view]||S.view;
   nav.innerHTML = items.map(([v,ic,t])=>`<button class="${cur===v?'on':''}" data-nav="${v}"><span class="ic">${ic}</span>${t}</button>`).join('');
 }
@@ -698,15 +698,19 @@ function renderFarmEdit(){
 }
 
 /* ---------- 牛一覧 ---------- */
-const REPRO_GROUPS=[['minus','妊（－）'],['wait','妊鑑待ち'],['plus','妊（＋）'],['excluded','繁殖除外'],['all','全て']];
-/* 牛一覧の群分け：繁殖状態ベース */
+const REPRO_GROUPS=[['minus','授精前'],['wait','妊鑑待ち'],['plus','妊（＋）'],['excluded','繁殖除外'],['all','全て']];
+/* 受胎状況：在群牛の繁殖ステージを1か所で判定（表示と群分けで共通利用） */
+function reproStage(st){
+  if(st.isPreg) return '妊（＋）';
+  const bred = st.lastAI && (!st.lastCalving || st.lastAI > st.lastCalving);   // 最終分娩より後の授精のみ有効
+  if(bred && (st.preg==='未確定' || st.preg==='再検')) return '妊鑑待ち';
+  return '授精前';                                                            // 未授精・不妊など
+}
+/* 牛一覧の群分け：繁殖除外（状態）＋受胎状況 */
 function repGroup(cow){
-  if(cow.status && cow.status!=='在群') return 'excluded';    // 乾乳・出荷・淘汰＝繁殖除外
-  const st=stateOf(cow);
-  if(st.isPreg) return 'plus';                                 // 妊娠確認済＝妊（＋）
-  const bredThisCycle = st.lastAI && (!st.lastCalving || st.lastAI > st.lastCalving); // 最終分娩より後の授精のみ有効
-  if(bredThisCycle && (st.preg==='未確定'||st.preg==='再検')) return 'wait';           // 授精済・鑑定待ち
-  return 'minus';                                              // 未授精・不妊など＝妊（－）
+  if(cow.status!=='在群') return 'excluded';                 // 繁殖除外
+  const s=reproStage(stateOf(cow));
+  return s==='妊（＋）'?'plus' : s==='妊鑑待ち'?'wait' : 'minus';
 }
 let cowFilter={q:'',group:'all'};
 function renderCows(){
@@ -727,39 +731,41 @@ function renderCows(){
       <button class="cow-row" data-act="opencow" data-id="${c.id}">
         <div class="id">
           <div class="nm">${esc(c.name||'(無名)')} <span class="tnum" style="color:var(--muted);font-weight:600;font-size:13px">${esc(c.tagNo||'')}</span></div>
-          <div class="meta">${pregTag(st,c)} ${st.parity>=1?`<span>産次${st.parity}</span>`:'<span class="tag heifer">未経産</span>'} ${st.daysSinceCalving!=null?`<span>分娩後${st.daysSinceCalving}日</span>`:''}</div>
+          <div class="meta">${reproTag(c,st)} ${st.parity>=1?`<span>産次${st.parity}</span>`:'<span class="tag heifer">未経産</span>'} ${st.daysSinceCalving!=null?`<span>分娩後${st.daysSinceCalving}日</span>`:''}</div>
         </div>
         <div class="rt"><span class="pill ${jmrClass(j)} tnum">${j==null?'—':j}</span><div class="sub">JMR</div></div>
       </button>`; }).join('') || '<div class="empty"><div class="e-ic">🐄</div><div class="e-t">該当する牛がいません</div></div>'}
     </div>`;
   fabSlot.innerHTML=`<button class="fab" data-act="quickadd" aria-label="牛を追加">＋</button>`;
 }
-function pregTag(st,c){
-  if(c && (c.status==='乾乳')) return '<span class="tag dry">乾乳</span>';
-  if(st.isPreg) return '<span class="tag preg">妊娠</span>';
-  if(st.preg==='未確定') return '<span class="tag wait">授精後</span>';
-  if(st.preg==='不妊'||st.preg==='再検') return `<span class="tag open">${st.preg}</span>`;
-  if(st.parity>=1||st.lastAI) return '<span class="tag open">未受胎</span>';
-  return '<span class="tag none">未授精</span>';
+function reproTag(c, st){
+  if(c && c.status!=='在群') return '<span class="tag dry">繁殖除外</span>';
+  const s=reproStage(st);
+  const cls = s==='妊（＋）'?'preg' : s==='妊鑑待ち'?'wait' : 'none';
+  return `<span class="tag ${cls}">${s}</span>`;
 }
 
 /* ---------- 牛の登録・編集 ---------- */
 function renderCowEdit(){
   const editing = S.param.id? S.cows.find(c=>c.id===S.param.id) : null;
-  const c = editing || {name:'',tagNo:'',cowNo:'',kyosaiNo:'',birthDate:'',status:'在群',note:''};
+  const c = editing || {name:'',tagNo:'',cowNo:'',kyosaiNo:'',parity:'',birthDate:'',status:'在群',note:''};
+  const curStatus = (c.status==='在群')?'在群':'繁殖除外';   // 旧状態(乾乳等)は繁殖除外に寄せる
   app.innerHTML=`
     <div class="card pad stack">
       <div class="row2">
-        <div class="field"><label>識別名</label><input type="text" id="c_name" value="${esc(c.name)}" placeholder="例：かれん"></div>
-        <div class="field"><label>識別番号</label><input type="text" id="c_tagNo" value="${esc(c.tagNo)}" placeholder="例：2851"></div>
+        <div class="field"><label>名号</label><input type="text" id="c_name" value="${esc(c.name)}" placeholder="例：かれん"></div>
+        <div class="field"><label>4桁</label><input type="text" id="c_tagNo" value="${esc(c.tagNo)}" placeholder="例：2851"></div>
       </div>
       <div class="row2">
-        <div class="field"><label>牛番号（任意）</label><input type="text" id="c_cowNo" value="${esc(c.cowNo)}"></div>
+        <div class="field"><label>個体識別番号 <span style="color:var(--amber)">（必須）</span></label><input type="text" id="c_cowNo" value="${esc(c.cowNo)}" placeholder="例：1641211091"></div>
+        <div class="field"><label>産次数（任意）</label><input type="number" id="c_parity" min="0" step="1" value="${c.parity!=null&&c.parity!==''?esc(String(c.parity)):''}" placeholder="例：2"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>生年月日 <span style="color:var(--amber)">（未経産JMRに必須）</span></label><input type="date" id="c_birthDate" value="${esc(c.birthDate)}"></div>
         <div class="field"><label>共済番号（任意）</label><input type="text" id="c_kyosaiNo" value="${esc(c.kyosaiNo)}"></div>
       </div>
-      <div class="field"><label>生年月日 <span style="color:var(--amber)">（未経産JMRに必須）</span></label><input type="date" id="c_birthDate" value="${esc(c.birthDate)}"></div>
-      <div class="field"><label>状態</label><select id="c_status">${STATUS_LIST.map(s=>`<option ${c.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
-      <div class="field"><label>備考</label><textarea id="c_note" placeholder="前歴など">${esc(c.note)}</textarea></div>
+      <div class="field"><label>状態</label><select id="c_status">${STATUS_LIST.map(s=>`<option ${curStatus===s?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="field"><label>備考</label><textarea id="c_note" placeholder="メモ">${esc(c.note)}</textarea></div>
     </div>
     <div class="btn-row" style="margin-top:16px"><button class="btn" data-act="savecow">${editing?'保存':'牛を登録'}</button></div>
     ${editing?`<button class="btn danger wide" style="margin-top:11px" data-act="delcow" data-id="${c.id}">この牛を削除（履歴も削除）</button>`:''}`;
@@ -777,12 +783,12 @@ function renderCow(){
       <div class="top">
         <div style="flex:1">
           <div class="nm">${esc(c.name||'(無名)')} <span class="tnum" style="font-size:15px;color:var(--muted)">${esc(c.tagNo||'')}</span></div>
-          <div class="sub">${st.parity>=1?`経産 産次${st.parity}`:'未経産'} ・ ${esc(c.status)} ${c.cowNo?` ・ 牛番号${esc(c.cowNo)}`:''}</div>
+          <div class="sub">${st.parity>=1?`経産 産次${st.parity}`:'未経産'} ・ ${esc(c.status)} ${c.cowNo?` ・ 個体識別番号${esc(c.cowNo)}`:''}</div>
         </div>
         <div style="text-align:center"><span class="pill ${jmrClass(j)} tnum" style="font-size:19px;min-width:56px;padding:7px 12px">${j==null?'—':j}</span><div class="sub" style="text-align:center;margin-top:3px">個体JMR</div></div>
       </div>
       <dl class="kv">
-        <dt>妊否</dt><dd>${pregTag(st,c)} ${st.dueDate?`<span class="tnum" style="color:var(--muted);font-weight:600">分娩予定 ${fmtJ(st.dueDate)}</span>`:''}</dd>
+        <dt>受胎状況</dt><dd>${reproTag(c,st)} ${st.dueDate?`<span class="tnum" style="color:var(--muted);font-weight:600">分娩予定 ${fmtJ(st.dueDate)}</span>`:''}</dd>
         ${c.birthDate?`<dt>生年月日 / 日齢</dt><dd class="tnum">${fmtJ(c.birthDate)} / ${st.age!=null?st.age+'日':'—'}</dd>`:''}
         ${st.lastCalving?`<dt>最終分娩</dt><dd class="tnum">${fmtJ(st.lastCalving)}（分娩後${st.daysSinceCalving}日）</dd>`:''}
         ${st.lastAI?`<dt>最終授精</dt><dd class="tnum">${fmtJ(st.lastAI)}（${st.daysSinceAI}日前）</dd>`:''}
@@ -1040,7 +1046,7 @@ function renderDataIO(){
   app.innerHTML=`
     <div class="section-h">CSV出力（PCの表計算ソフト用・UTF-8 BOM付）</div>
     <div class="card pad">
-      ${chk('cows','牛マスタ','識別名・番号・生年月日・状態など')}
+      ${chk('cows','牛マスタ','名号・4桁・個体識別番号・生年月日・状態など')}
       ${chk('events','イベント','分娩／授精／妊鑑／検診所見／乾乳')}
       ${chk('jmr','JMR月別系列','月・群JMR・経産/未経産内訳・頭数')}
       ${chk('kpi','KPI集計','2.3の各指標')}
@@ -1112,12 +1118,12 @@ function exportCSV(){
   const parts=[];
   const farmName=S.farm.name;
   if(ioSel.cows){
-    const rows=[['識別名','識別番号','牛番号','共済番号','生年月日','状態','産次','妊否','個体JMR','最終分娩','最終授精','備考']];
-    S.cows.forEach(c=>{ const st=stateOf(c),j=jmrOf(c); rows.push([c.name,c.tagNo,c.cowNo,c.kyosaiNo,c.birthDate,c.status,st.parity,st.preg,(j==null?'':j),st.lastCalving||'',st.lastAI||'',c.note]); });
+    const rows=[['名号','4桁','個体識別番号','共済番号','生年月日','状態','産次','受胎状況','個体JMR','最終分娩','最終授精','備考']];
+    S.cows.forEach(c=>{ const st=stateOf(c),j=jmrOf(c); const cs=(c.status!=='在群'?'繁殖除外':reproStage(st)); rows.push([c.name,c.tagNo,c.cowNo,c.kyosaiNo,c.birthDate,c.status,st.parity,cs,(j==null?'':j),st.lastCalving||'',st.lastAI||'',c.note]); });
     parts.push(['牛マスタ',rows]);
   }
   if(ioSel.events){
-    const rows=[['識別名','識別番号','日付','種別','種雄牛','方式','精液','結果','左卵巣','右卵巣','子宮','BCS','処置','指示','備考']];
+    const rows=[['名号','4桁','日付','種別','種雄牛','方式','精液','結果','左卵巣','右卵巣','子宮','BCS','処置','指示','備考']];
     const cowMap=Object.fromEntries(S.cows.map(c=>[c.id,c]));
     S.events.filter(e=>(!from||e.date>=from)&&(!to||e.date<=to)).sort((a,b)=>a.date<b.date?-1:1)
       .forEach(e=>{ const c=cowMap[e.cowId]||{}; rows.push([c.name,c.tagNo,e.date,EVENT_LABEL[e.type],e.sire,e.method,e.semenType,e.result,e.leftOvary,e.rightOvary,e.uterus,e.bcs,e.treatment,e.instruction,e.note]); });
@@ -1139,9 +1145,9 @@ function exportCSV(){
   }
   if(ioSel.lists){
     const oa=openAiList(), pc=pregCheckList();
-    const r1=[['未授精リスト'],['識別名','識別番号','分娩後日数','産次','最終分娩','最終授精']];
+    const r1=[['未授精リスト'],['名号','4桁','分娩後日数','産次','最終分娩','最終授精']];
     oa.forEach(({c,st})=>r1.push([c.name,c.tagNo,st.daysSinceCalving,st.parity,st.lastCalving||'',st.lastAI||'']));
-    const r2=[['妊鑑リスト'],['識別名','識別番号','種付け後日数','産次','最終授精','最終鑑定']];
+    const r2=[['妊鑑リスト'],['名号','4桁','種付け後日数','産次','最終授精','最終鑑定']];
     pc.forEach(({c,st})=>r2.push([c.name,c.tagNo,st.daysSinceAI,st.parity,st.lastAI||'',st.lastPC?st.lastPC.date:'']));
     parts.push(['リスト',[...r1,[''],...r2]]);
   }
@@ -1256,9 +1262,9 @@ function csvGuideHTML(){
     <h4>農場CSV（任意・先頭行のみ使用）</h4>
     <div class="col"><b>農場名</b>（必須 例:<code>第一牧場</code>）／ 初産VWP <code>80</code>／経産VWP <code>60</code>／未経産授精開始日齢 <code>390</code>／妊娠期間 <code>285</code>／発情周期 <code>21</code>／未授精閾値 <code>40</code>／妊鑑閾値 <code>28</code>／損失単価 <code>300</code>。空欄は既定値。<b>省略すると今選んでいる農場</b>に取り込みます。</div>
     <h4>牛CSV（個体データ）</h4>
-    <div class="col"><b>個体識別番号</b>（例:<code>2851</code>・イベントと紐づけるキー）／牛名（例:<code>かれん</code>）／牛番号／共済番号／<b>生年月日</b>（例:<code>2021-03-01</code>・未経産JMRに必要）／状態（<code>在群/乾乳/出荷/淘汰</code>・既定 在群）／備考</div>
+    <div class="col"><b>4桁</b>（例:<code>2851</code>・イベントと紐づけるキー）／名号（例:<code>かれん</code>）／<b>個体識別番号</b>（10桁の正式番号 例:<code>1641211091</code>）／産次数（例:<code>2</code>・省略時は分娩イベント数から算出）／<b>生年月日</b>（例:<code>2021-03-01</code>・未経産JMRに必要）／状態（<code>在群/繁殖除外</code>・既定 在群）／備考</div>
     <h4>イベントCSV（履歴）</h4>
-    <div class="col"><b>個体識別番号</b>（牛CSVと一致）／<b>日付</b>（例:<code>2026-02-01</code>）／<b>種別</b>（<code>分娩/授精/妊娠鑑定/検診/乾乳</code>）／種雄／授精方法（<code>AI/ET</code>）／精液種別／妊娠鑑定結果（<code>妊娠/不妊/再検</code>）／左卵巣／右卵巣／子宮／BCS／処置／指示／備考。<span style="color:var(--muted)">※種別ごとに使う列だけ記入すればOK（分娩は日付だけでも可）。</span></div>
+    <div class="col"><b>4桁</b>（牛CSVと一致）／<b>日付</b>（例:<code>2026-02-01</code>）／<b>種別</b>（<code>分娩/授精/妊娠鑑定/検診/乾乳</code>）／種雄／授精方法（<code>AI/ET</code>）／精液種別／妊娠鑑定結果（<code>妊娠/不妊/再検</code>）／左卵巣／右卵巣／子宮／BCS／処置／指示／備考。<span style="color:var(--muted)">※種別ごとに使う列だけ記入すればOK（分娩は日付だけでも可）。</span></div>
   </div>`;
 }
 async function importCSVBundle(){
@@ -1289,30 +1295,32 @@ async function importCSVBundle(){
     }
 
     /* --- 牛 --- */
+    const KEY_ALIASES=['4桁','個体識別番号','識別番号','タグ番号','タグ','耳標番号'];
     const keyToCow=new Map(); const cows=[];
     for(const r of cowRows){
-      const tag=pick(r,['個体識別番号','識別番号','タグ番号','タグ','耳標番号']);
-      const name=pick(r,['牛名','名前','個体名','名号']);
+      const tag=pick(r,KEY_ALIASES);
+      const name=pick(r,['名号','牛名','名前','個体名']);
       const key=tag||name;
-      if(!key){ warn.push('識別番号も牛名も無い行をスキップしました。'); continue; }
-      if(keyToCow.has(key)) warn.push(`識別「${key}」が重複。後の行で上書きしました。`);
+      if(!key){ warn.push('4桁も名号も無い行をスキップしました。'); continue; }
+      if(keyToCow.has(key)) warn.push(`「${key}」が重複。後の行で上書きしました。`);
       const bdRaw=pick(r,['生年月日','誕生日']); const bd=parseAnyDate(bdRaw);
       if(bdRaw && !bd) warn.push(`「${key}」の生年月日「${bdRaw}」を日付に変換できず空にしました。`);
       let st=pick(r,['状態','ステータス'])||'在群';
-      if(!STATUS_LIST.includes(st)){ warn.push(`「${key}」の状態「${st}」は未対応→在群。`); st='在群'; }
+      if(st!=='在群') st='繁殖除外';                         // 在群以外はすべて繁殖除外に正規化
+      const pRaw=pick(r,['産次数','産歴','産次']); const pv=pRaw===''?null:Math.max(0,parseInt(pRaw,10)||0);
       const cow={ id:uid(), farmId:farm.id, name, tagNo:tag,
-        cowNo:pick(r,['牛番号','個体番号']), kyosaiNo:pick(r,['共済番号']),
-        birthDate: bd||'', status:st, note:pick(r,['備考','メモ']) };
+        cowNo:pick(r,['個体識別番号','牛番号','個体番号']), kyosaiNo:pick(r,['共済番号']),
+        parity:pv, birthDate: bd||'', status:st, note:pick(r,['備考','メモ']) };
       keyToCow.set(key,cow); cows.push(cow);
     }
 
     /* --- イベント --- */
     const events=[]; let stub=0, skipDate=0, skipType=0;
     for(const r of evRows){
-      const key=pick(r,['個体識別番号','識別番号','タグ番号','タグ','耳標番号'])||pick(r,['牛名','名前']);
-      if(!key){ warn.push('個体識別番号の無いイベント行をスキップしました。'); continue; }
+      const key=pick(r,KEY_ALIASES)||pick(r,['名号','牛名','名前']);
+      if(!key){ warn.push('4桁（個体キー）の無いイベント行をスキップしました。'); continue; }
       let cow=keyToCow.get(key);
-      if(!cow){ cow={ id:uid(), farmId:farm.id, name:key, tagNo:key, cowNo:'', kyosaiNo:'', birthDate:'', status:'在群', note:'CSV取込時に自動作成' }; keyToCow.set(key,cow); cows.push(cow); stub++; }
+      if(!cow){ cow={ id:uid(), farmId:farm.id, name:key, tagNo:key, cowNo:'', kyosaiNo:'', parity:null, birthDate:'', status:'在群', note:'CSV取込時に自動作成' }; keyToCow.set(key,cow); cows.push(cow); stub++; }
       const type=TYPE_MAP[pick(r,['種別','イベント','種類','区分'])];
       if(!type){ skipType++; continue; }
       const date=parseAnyDate(pick(r,['日付','年月日','日']));
@@ -1454,10 +1462,12 @@ async function delFarm(id){
 }
 async function saveCow(){
   const name=$('#c_name').value.trim(), tagNo=$('#c_tagNo').value.trim();
-  if(!name && !tagNo){ toast('識別名か識別番号を入力してください'); return; }
+  const cowNo=$('#c_cowNo').value.trim();
+  if(!cowNo){ toast('個体識別番号を入力してください（必須）'); return; }
   const editing=S.param.id? S.cows.find(c=>c.id===S.param.id):null;
   const c=editing?{...editing}:{id:uid(),farmId:S.farm.id};
-  c.name=name; c.tagNo=tagNo; c.cowNo=$('#c_cowNo').value.trim(); c.kyosaiNo=$('#c_kyosaiNo').value.trim();
+  c.name=name; c.tagNo=tagNo; c.cowNo=cowNo; c.kyosaiNo=$('#c_kyosaiNo').value.trim();
+  const pv=$('#c_parity').value.trim(); c.parity = pv===''? null : Math.max(0, parseInt(pv,10)||0);
   c.birthDate=$('#c_birthDate').value; c.status=$('#c_status').value; c.note=$('#c_note').value.trim();
   await DB.put('cows',c); await loadFarm(S.farm.id);
   toast(editing?'保存しました':'牛を登録しました');
