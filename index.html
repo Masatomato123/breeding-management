@@ -182,6 +182,9 @@ textarea{min-height:74px;resize:vertical;line-height:1.45}
 .list-card .lc-days{margin-left:auto;text-align:right}
 .list-card .lc-days b{font-size:20px;font-weight:800}
 .list-card .lc-days span{font-size:10.5px;color:var(--muted);display:block}
+.list-card .lc-days.soon b{color:var(--amber)}
+.list-card .lc-days.over b{color:#c0392b}
+.list-card .lc-days.over span{color:#c0392b}
 .list-card .lc-hist{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5}
 .list-card .lc-find{margin-top:9px;border-top:1px dashed var(--line);padding-top:10px}
 .expander-btn{margin-top:9px;font-size:13px;font-weight:700;color:var(--green);display:flex;align-items:center;gap:6px}
@@ -467,6 +470,12 @@ function pregCheckList(){
         && (!st.lastPC || st.lastPC.date < st.lastAI))   // 最新授精への鑑定が未実施
     .sort((a,b)=> b.st.daysSinceAI - a.st.daysSinceAI);
 }
+/* 分娩まで：妊（＋）の牛を、分娩予定日（受胎授精＋妊娠期間）が近い順に */
+function dueList(){
+  return S.cows.filter(c=>c.status==='在群').map(c=>({c,st:stateOf(c)}))
+    .filter(({st})=> st.isPreg && st.dueDate)
+    .sort((a,b)=> a.st.dueDate<b.st.dueDate?-1 : a.st.dueDate>b.st.dueDate?1 : 0);
+}
 
 /* 繁殖履歴の1行要約（リスト用） */
 function historyLine(st){
@@ -567,7 +576,7 @@ function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('sh
 function renderHeader(){
   const pushed = !!S.back;
   const title = ({home:'ホーム',farms:'農場管理',cows:'牛一覧',cow:'個体カルテ',event:'イベント入力',
-    openai:'未授精リスト',pregcheck:'妊鑑リスト',lists:'検診リスト',jmr:'JMR月別推移',kpi:'KPIダッシュボード',
+    openai:'未授精リスト',pregcheck:'妊鑑リスト',due:'分娩まで',lists:'検診リスト',jmr:'JMR月別推移',kpi:'KPIダッシュボード',
     dataio:'データ取り込み・出力',farmEdit:'農場設定',cowEdit:'牛の登録・編集'})[S.view]||'繁殖巡回';
   const todayOff = S.base!==todayStr();
   hdr.innerHTML = `
@@ -584,7 +593,7 @@ function renderHeader(){
 /* ---- ボトムナビ ---- */
 function renderNav(){
   const items=[['home','🏠','ホーム'],['cows','🐄','牛一覧'],['lists','📋','検診リスト'],['metrics','📈','指標'],['dataio','💾','データ']];
-  const cur = ({openai:'lists',pregcheck:'lists',jmr:'metrics',kpi:'metrics',cow:'cows',cowEdit:'cows',event:'cows',farms:'home',farmEdit:'home'})[S.view]||S.view;
+  const cur = ({openai:'lists',pregcheck:'lists',due:'lists',jmr:'metrics',kpi:'metrics',cow:'cows',cowEdit:'cows',event:'cows',farms:'home',farmEdit:'home'})[S.view]||S.view;
   nav.innerHTML = items.map(([v,ic,t])=>`<button class="${cur===v?'on':''}" data-nav="${v}"><span class="ic">${ic}</span>${t}</button>`).join('');
 }
 
@@ -601,6 +610,7 @@ function render(){
   if(v==='event') return renderEvent();
   if(v==='lists'||v==='openai') return renderList('openai');
   if(v==='pregcheck') return renderList('pregcheck');
+  if(v==='due') return renderList('due');
   if(v==='metrics'||v==='jmr') return renderJMR();
   if(v==='kpi') return renderKPI();
   if(v==='dataio') return renderDataIO();
@@ -731,7 +741,7 @@ function renderCows(){
       <button class="cow-row" data-act="opencow" data-id="${c.id}">
         <div class="id">
           <div class="nm">${esc(c.name||'(無名)')} <span class="tnum" style="color:var(--muted);font-weight:600;font-size:13px">${esc(c.tagNo||'')}</span></div>
-          <div class="meta">${reproTag(c,st)} ${st.parity>=1?`<span>産次${st.parity}</span>`:'<span class="tag heifer">未経産</span>'} ${st.daysSinceCalving!=null?`<span>分娩後${st.daysSinceCalving}日</span>`:''}</div>
+          <div class="meta">${reproTag(c,st)} ${st.parity>=1?`<span>産次${st.parity}</span>`:'<span class="tag heifer">未経産</span>'} ${st.isPreg&&st.dueDate?`<span>分娩予定 ${fmtJ(st.dueDate)}</span>`:(st.daysSinceCalving!=null?`<span>分娩後${st.daysSinceCalving}日</span>`:'')}</div>
         </div>
         <div class="rt"><span class="pill ${jmrClass(j)} tnum">${j==null?'—':j}</span><div class="sub">JMR</div></div>
       </button>`; }).join('') || '<div class="empty"><div class="e-ic">🐄</div><div class="e-t">該当する牛がいません</div></div>'}
@@ -865,18 +875,44 @@ function renderEvent(){
 
 /* ---------- リスト（未授精／妊鑑） ---------- */
 let listTab='openai', openFind=new Set();
-function renderList(tab){ listTab = (S.view==='pregcheck')?'pregcheck':(S.param.tab||tab||listTab);
+function listTabs(active){
+  return `<div class="seg seg-repro" style="margin-bottom:14px">
+      <button data-listtab="openai" class="${active==='openai'?'on':''}">未授精 (${openAiList().length})</button>
+      <button data-listtab="pregcheck" class="${active==='pregcheck'?'on':''}">妊鑑 (${pregCheckList().length})</button>
+      <button data-listtab="due" class="${active==='due'?'on':''}">分娩まで (${dueList().length})</button>
+    </div>`;
+}
+function renderList(tab){
+  listTab = ({openai:'openai',pregcheck:'pregcheck',due:'due'})[S.view] || S.param.tab || tab || listTab;
+  if(listTab==='due') return renderDueList();
   const isOA = listTab==='openai';
   const rows = isOA? openAiList() : pregCheckList();
   app.innerHTML=`
-    <div class="seg" style="margin-bottom:14px">
-      <button data-listtab="openai" class="${isOA?'on':''}">未授精 (${openAiList().length})</button>
-      <button data-listtab="pregcheck" class="${!isOA?'on':''}">妊鑑 (${pregCheckList().length})</button>
-    </div>
+    ${listTabs(listTab)}
     <div class="info" style="margin-bottom:12px">${isOA
       ? `未受胎かつ分娩後 ${S.farm.openAiThreshold}日以上、最終分娩以降に授精なしの牛`
       : `最終授精から ${S.farm.pregCheckThreshold}日以上経過し、その授精への鑑定が未実施の牛`}</div>
     ${rows.map(({c,st})=>renderListCard(c,st,isOA)).join('') || '<div class="empty"><div class="e-ic">✅</div><div class="e-t">対象の牛はいません</div></div>'}`;
+}
+function renderDueList(){
+  const rows=dueList();
+  app.innerHTML=`
+    ${listTabs('due')}
+    <div class="info" style="margin-bottom:12px">妊（＋）の牛を、分娩予定日（受胎した授精日＋${S.farm.gestationDays}日）が近い順に表示</div>
+    ${rows.map(({c,st})=>renderDueCard(c,st)).join('') || '<div class="empty"><div class="e-ic">🐮</div><div class="e-t">妊娠中の牛はいません</div></div>'}`;
+}
+function renderDueCard(c,st){
+  const d = daysBetween(S.base, st.dueDate);        // 予定日までの残り日数（負なら超過）
+  const cls = d<0? 'over' : (d<=14? 'soon':'');
+  return `<div class="list-card">
+    <div class="lc-top">
+      <button data-act="opencow" data-id="${c.id}" style="text-align:left;flex:1">
+        <div class="lc-nm">${esc(c.name||'(無名)')} <span class="tnum" style="color:var(--muted);font-size:12.5px">${esc(c.tagNo||'')}</span></div>
+        <div class="lc-hist">分娩予定 <b>${fmtJ(st.dueDate)}</b>${st.conceptionAI?`　（受胎授精 ${fmtJ(st.conceptionAI)}）`:''}</div>
+      </button>
+      <div class="lc-days ${cls}"><b class="tnum">${d>=0?d:'−'+(-d)}</b><span>${d>=0?'分娩まで':'超過'}</span></div>
+    </div>
+  </div>`;
 }
 function renderListCard(c,st,isOA){
   const days = isOA? st.daysSinceCalving : st.daysSinceAI;
@@ -1516,7 +1552,7 @@ async function quickPC(cowId){
 document.addEventListener('click', async (ev)=>{
   const nb=ev.target.closest('[data-nav]');
   if(nb){ const v=nb.dataset.nav; const tab=nb.dataset.tab;
-    if(v==='lists'){ listTab=tab||'openai'; go(tab==='pregcheck'?'pregcheck':'openai',{tab:listTab}); return; }
+    if(v==='lists'){ const tb=tab||'openai'; listTab=tb; go(tb,{tab:tb}); return; }
     if(v==='metrics'){ go('jmr'); return; }
     if(v==='home'&&nb.dataset.act==='managefarms'){ go('farms'); return; }
     if(['home','cows','dataio'].includes(v)){ go(v); return; }
@@ -1529,7 +1565,7 @@ document.addEventListener('click', async (ev)=>{
     case 'basedate': sheetBaseDate(); break;
     case 'settoday': S.base=todayStr(); closeSheet(); render(); break;
     case 'applydate': { const d=$('#sheet-date').value; if(d){ S.base=d; } closeSheet(); render(); } break;
-    case 'opentab': go(el.dataset.tab==='pregcheck'?'pregcheck':'openai',{tab:el.dataset.tab}); break;
+    case 'opentab': go(el.dataset.tab,{tab:el.dataset.tab}); break;
     case 'managefarms': go('farms'); break;
     case 'gomanage': closeSheet(); go('farms'); break;
     case 'farmsettings': push('farmEdit',{id:S.farm.id}); break;
@@ -1575,7 +1611,7 @@ document.addEventListener('click',(ev)=>{
   // 牛一覧フィルタ
   const fs=t.closest('[data-fgroup]'); if(fs){ cowFilter.group=fs.dataset.fgroup; render(); return; }
   // リストタブ
-  const lt=t.closest('[data-listtab]'); if(lt){ go(lt.dataset.listtab==='pregcheck'?'pregcheck':'openai',{tab:lt.dataset.listtab}); return; }
+  const lt=t.closest('[data-listtab]'); if(lt){ const tb=lt.dataset.listtab; go(tb,{tab:tb}); return; }
   // 指標タブ
   const mt=t.closest('[data-metrictab]'); if(mt){ go(mt.dataset.metrictab==='kpi'?'kpi':'jmr'); return; }
   // JMRオプション
