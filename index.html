@@ -169,7 +169,8 @@ textarea{min-height:74px;resize:vertical;line-height:1.45}
 .tl-item+.tl-item{margin-top:9px}
 .tl-item .dot{position:absolute;left:12px;top:15px;width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1.5px var(--line)}
 .tl-item .dt{font-size:12px;color:var(--muted);font-weight:600}
-.tl-item .ty{font-weight:700;font-size:14.5px;margin-top:1px;display:flex;align-items:center;gap:7px}
+.tl-item .ty{font-weight:700;font-size:14.5px;margin-top:1px;display:flex;align-items:center;gap:7px;padding-right:52px}
+.tl-iv{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--green);background:#e9f4ee;border:1px solid #cfe6d8;border-radius:999px;padding:2px 9px;white-space:nowrap}
 .tl-item .body{font-size:13px;color:#40514a;margin-top:5px;line-height:1.5;white-space:pre-wrap}
 .tl-item .del{position:absolute;right:8px;top:8px;color:var(--faint);font-size:12px;padding:6px 8px}
 .dot.calving{background:#8b5cf6}.dot.AI{background:#2563eb}.dot.preg_check{background:#059669}.dot.exam{background:#d97706}.dot.dry_off{background:#6b7280}
@@ -462,13 +463,11 @@ function openAiList(){
         && (!st.lastAI || st.lastAI < st.lastCalving))
     .sort((a,b)=> b.st.daysSinceCalving - a.st.daysSinceCalving);
 }
-/* 妊鑑リスト：授精あり かつ 種付け後日数≥pregCheckThreshold かつ その授精への鑑定が未実施 */
+/* 妊鑑リスト：授精状況が「妊娠鑑定待ち」の牛（手入力優先／未入力はイベントから自動判定） */
 function pregCheckList(){
-  const F=S.farm;
   return S.cows.filter(c=>c.status==='在群').map(c=>({c,st:stateOf(c)}))
-    .filter(({st})=> st.lastAI && st.daysSinceAI!=null && st.daysSinceAI>=F.pregCheckThreshold
-        && (!st.lastPC || st.lastPC.date < st.lastAI))   // 最新授精への鑑定が未実施
-    .sort((a,b)=> b.st.daysSinceAI - a.st.daysSinceAI);
+    .filter(({c,st})=> stageLabel(c,st)==='妊娠鑑定待ち')
+    .sort((a,b)=> (b.st.daysSinceAI==null?-1:b.st.daysSinceAI) - (a.st.daysSinceAI==null?-1:a.st.daysSinceAI));
 }
 /* 分娩まで：妊（＋）の牛を、分娩予定日（受胎授精＋妊娠期間）が近い順に */
 function dueList(){
@@ -833,10 +832,15 @@ function renderTLItem(e){
   else if(e.type==='preg_check') body=`結果：${esc(e.result||'')}`;
   else if(e.type==='exam') body=[e.leftOvary?`左卵巣：${esc(e.leftOvary)}`:'',e.rightOvary?`右卵巣：${esc(e.rightOvary)}`:'',e.uterus?`子宮：${esc(e.uterus)}`:'',(e.bcs!=null&&e.bcs!=='')?`BCS：${esc(e.bcs)}`:'',e.treatment?`処置：${esc(e.treatment)}`:'',e.instruction?`指示：${esc(e.instruction)}`:''].filter(Boolean).join('\n');
   if(e.note) body += (body?'\n':'')+`備考：${esc(e.note)}`;
+  let rightTag='';
+  if(e.type==='calving'){                                   // 前回分娩からの間隔を右側に表示
+    const prev = eventsByCow(e.cowId).filter(x=>x.type==='calving' && x.date < e.date).pop();
+    if(prev){ const iv=daysBetween(prev.date, e.date); rightTag=`<span class="tl-iv tnum">分娩間隔 ${iv}日（約${(iv/30.4).toFixed(1)}ヶ月）</span>`; }
+  }
   return `<div class="tl-item">
     <span class="dot ${e.type}"></span>
     <div class="dt tnum">${fmtJ(e.date)}</div>
-    <div class="ty">${EVENT_LABEL[e.type]}</div>
+    <div class="ty">${EVENT_LABEL[e.type]}${rightTag}</div>
     ${body?`<div class="body">${body}</div>`:''}
     <button class="del" data-act="delevent" data-id="${e.id}">削除</button>
   </div>`;
@@ -844,6 +848,14 @@ function renderTLItem(e){
 
 /* ---------- イベント入力 ---------- */
 let evForm={type:'exam'};
+function calvingIntervalHint(c, dateStr){
+  if(!c) return '';
+  const prev = eventsByCow(c.id).filter(x=>x.type==='calving' && (!dateStr || x.date < dateStr)).pop();
+  if(!prev) return '前回分娩の記録はありません（初回分娩として記録されます）。';
+  const iv = daysBetween(prev.date, dateStr||todayStr());
+  if(iv<0) return `⚠ 入力日が前回分娩（${fmtJ(prev.date)}）より前です。日付をご確認ください。`;
+  return `前回分娩 ${fmtJ(prev.date)} から <b>分娩間隔 ${iv}日（約${(iv/30.4).toFixed(1)}ヶ月）</b>`;
+}
 function renderEvent(){
   const c=S.cows.find(x=>x.id===S.param.cowId);
   if(!c){ app.innerHTML='<div class="empty">牛が見つかりません</div>'; return; }
@@ -856,6 +868,8 @@ function renderEvent(){
     <div class="field"><label>精液種別（任意）</label><select id="e_semenType"><option value="">—</option><option>通常</option><option>性判別</option><option>受精卵</option></select></div>`;
   else if(t==='preg_check') fields=`
     <div class="field"><label>結果</label><div class="chips" id="pc-chips">${PREG_RESULTS.map((r,i)=>`<button type="button" class="chip ${i===0?'on':''}" data-pc="${r}">${r}</button>`).join('')}</div><input type="hidden" id="e_result" value="妊娠"></div>`;
+  else if(t==='calving') fields=`
+    <div class="field"><div class="info" id="ci-hint">${calvingIntervalHint(c, S.base)}</div></div>`;
   else if(t==='exam') fields=`
     <div class="row2">
       <div class="field"><label>左卵巣</label><input type="text" id="e_leftOvary" list="ovary-sug" placeholder="所見"></div>
@@ -901,7 +915,7 @@ function renderList(tab){
     ${listTabs(listTab)}
     <div class="info" style="margin-bottom:12px">${isOA
       ? `未受胎かつ分娩後 ${S.farm.openAiThreshold}日以上、最終分娩以降に授精なしの牛`
-      : `最終授精から ${S.farm.pregCheckThreshold}日以上経過し、その授精への鑑定が未実施の牛`}</div>
+      : `授精状況が「妊娠鑑定待ち」の牛（個体編集で変更できます）`}</div>
     ${rows.map(({c,st})=>renderListCard(c,st,isOA)).join('') || '<div class="empty"><div class="e-ic">✅</div><div class="e-t">対象の牛はいません</div></div>'}`;
 }
 function renderDueList(){
@@ -932,7 +946,7 @@ function renderListCard(c,st,isOA){
       <button data-act="opencow" data-id="${c.id}" style="text-align:left;flex:1">
         <div class="lc-nm">${esc(c.name||'(無名)')} <span class="tnum" style="color:var(--muted);font-size:12.5px">${esc(c.tagNo||'')}</span></div>
       </button>
-      <div class="lc-days"><b class="tnum">${days}</b><span>${isOA?'分娩後日数':'種付け後日数'}</span></div>
+      <div class="lc-days"><b class="tnum">${days==null?'—':days}</b><span>${isOA?'分娩後日数':'種付け後日数'}</span></div>
     </div>
     <div class="lc-hist">${historyLine(st)}</div>
     ${st.lastPC && !isOA?'':''}
@@ -1637,6 +1651,7 @@ document.addEventListener('input',(ev)=>{
     // 再描画すると入力欄が作り直されるため、軽量に絞り込みだけ更新
     debouncedCows(); return; }
   if(t.dataset && t.dataset.io!=null){ ioSel[t.dataset.io]=t.checked; return; }
+  if(t.id==='e_date' && evForm.type==='calving'){ const el=$('#ci-hint'); if(el){ el.innerHTML=calvingIntervalHint(S.cows.find(x=>x.id===S.param.cowId), t.value); } return; }
 });
 document.addEventListener('change',(ev)=>{
   const t=ev.target;
